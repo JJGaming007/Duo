@@ -2,15 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Grid3X3, PlusCircle, BarChart3, User, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Grid3X3, PlusCircle, BarChart3, Heart, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIdentity } from '@/lib/identity'
+import { getUserName } from '@/lib/constants'
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Tracker', href: '/tracker', icon: Grid3X3 },
     { name: 'Log', href: '/log', icon: PlusCircle },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Connect', href: '/bond', icon: Heart },
 ]
 
 export function Navbar() {
@@ -55,7 +57,7 @@ export function Navbar() {
                             title="Switch User"
                         >
                             <RefreshCw className="h-3 w-3" />
-                            <span>{currentId === 'user-1' ? 'Partner A' : 'Partner B'}</span>
+                            <span>{getUserName(currentId || 'user-1')}</span>
                         </button>
                     </div>
                 </div>

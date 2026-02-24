@@ -10,8 +10,6 @@ export async function GET(req: Request) {
 
     if (!userId) return new NextResponse("User ID required", { status: 400 });
 
-    await seedUsers();
-
     const today = new Date().toISOString().split('T')[0];
 
     // Fetch all streaks

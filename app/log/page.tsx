@@ -9,6 +9,10 @@ import { Toggle } from '@/components/ui/Toggle'
 import { toast } from 'react-hot-toast'
 import { ArrowLeft, Send, User } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
+import { getUserName } from '@/lib/constants'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function LogPage() {
     const router = useRouter()
@@ -23,21 +27,13 @@ export default function LogPage() {
         notes: '',
     })
 
+    const { data: stats } = useSWR(currentId ? `/api/stats?userId=${currentId}` : null, fetcher)
+
     useEffect(() => {
-        const fetchStats = async () => {
-            if (!currentId) return
-            try {
-                const res = await fetch(`/api/stats?userId=${currentId}`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setFormData(prev => ({ ...prev, courseDay: data.courseDay }))
-                }
-            } catch (error) {
-                console.error(error)
-            }
+        if (stats) {
+            setFormData(prev => ({ ...prev, courseDay: stats.courseDay }))
         }
-        fetchStats()
-    }, [currentId])
+    }, [stats])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -79,7 +75,7 @@ export default function LogPage() {
                     <div className="flex items-center gap-2 mb-2">
                         <User className="h-4 w-4 text-green-500" />
                         <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                            Logging as {currentId === 'user-1' ? 'Partner A' : 'Partner B'}
+                            Logging as {getUserName(currentId || 'user-1')}
                         </span>
                     </div>
                     <CardTitle className="text-2xl font-bold">Log Daily Progress</CardTitle>

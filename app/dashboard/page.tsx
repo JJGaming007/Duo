@@ -9,37 +9,21 @@ import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
 import { pusherClient } from '@/lib/pusher'
 import { useIdentity } from '@/lib/identity'
+import { getUserName } from '@/lib/constants'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function DashboardPage() {
     const router = useRouter()
     const { currentId, isLoading } = useIdentity()
-    const [statsLoading, setStatsLoading] = useState(true)
-    const [stats, setStats] = useState({
-        userStreak: 0,
-        partnerStreak: 0,
-        todayCompleted: false,
-        courseDay: 1,
-    })
 
-    const fetchStats = async () => {
-        if (!currentId) return
-        try {
-            const res = await fetch(`/api/stats?userId=${currentId}`)
-            if (res.ok) {
-                const data = await res.json()
-                setStats(data)
-            }
-        } catch (error) {
-            console.error(error)
-        } finally {
-            setStatsLoading(false)
-        }
-    }
+    const { data: stats, mutate } = useSWR(currentId ? `/api/stats?userId=${currentId}` : null, fetcher, {
+        revalidateOnFocus: true
+    })
 
     useEffect(() => {
         if (currentId) {
-            fetchStats()
-
             // Real-time listener for partner progress
             const channel = pusherClient.subscribe('partner-progress')
             channel.bind('log-complete', (data: any) => {
@@ -47,7 +31,7 @@ export default function DashboardPage() {
                     toast(`${data.userName || 'Partner'} just completed a day! 🚀`, {
                         icon: '👏',
                     })
-                    fetchStats()
+                    mutate()
                 }
             })
 
@@ -57,7 +41,15 @@ export default function DashboardPage() {
         }
     }, [currentId])
 
-    if (isLoading || statsLoading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
+    if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
+
+    // Provide default stats while SWR is loading to avoid layout shifts or blocking spinners
+    const currentStats = stats || {
+        userStreak: 0,
+        partnerStreak: 0,
+        todayCompleted: false,
+        courseDay: 1,
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -66,7 +58,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2">
                     <span className="text-zinc-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                     <span className="px-2 py-0.5 rounded-full bg-green-900/20 border border-green-900/50 text-green-500 text-[10px] uppercase font-bold tracking-wider">
-                        Logged in as {currentId === 'user-1' ? 'Partner A' : 'Partner B'}
+                        Logged in as {getUserName(currentId || 'user-1')}
                     </span>
                 </div>
             </header>
@@ -78,7 +70,7 @@ export default function DashboardPage() {
                         <Flame className="h-5 w-5 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-4xl font-bold text-white">{stats.userStreak}</div>
+                        <div className="text-4xl font-bold text-white">{currentStats.userStreak}</div>
                         <p className="text-xs text-zinc-500">Keep it up! 🔥</p>
                     </CardContent>
                 </Card>
@@ -88,7 +80,7 @@ export default function DashboardPage() {
                         <Trophy className="h-5 w-5 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-4xl font-bold text-white">{stats.partnerStreak}</div>
+                        <div className="text-4xl font-bold text-white">{currentStats.partnerStreak}</div>
                         <p className="text-xs text-zinc-500">Healthy competition! 🚀</p>
                     </CardContent>
                 </Card>
@@ -99,16 +91,16 @@ export default function DashboardPage() {
                 <CardHeader>
                     <div className="flex items-center gap-2 text-zinc-400">
                         <Calendar className="h-4 w-4" />
-                        <span className="text-sm font-medium uppercase tracking-wider">Day {stats.courseDay} of 100</span>
+                        <span className="text-sm font-medium uppercase tracking-wider">Day {currentStats.courseDay} of 100</span>
                     </div>
                     <CardTitle className="text-2xl font-bold">Today&apos;s Progress</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center py-6 gap-6">
                     <div className={cn(
                         "h-24 w-24 rounded-full flex items-center justify-center transition-all duration-500",
-                        stats.todayCompleted ? "bg-green-600 shadow-lg shadow-green-900/40" : "bg-zinc-800 border-2 border-dashed border-zinc-700"
+                        currentStats.todayCompleted ? "bg-green-600 shadow-lg shadow-green-900/40" : "bg-zinc-800 border-2 border-dashed border-zinc-700"
                     )}>
-                        {stats.todayCompleted ? (
+                        {currentStats.todayCompleted ? (
                             <CheckCircle2 className="h-12 w-12 text-white" />
                         ) : (
                             <span className="text-zinc-600 font-bold text-xl">?</span>
@@ -117,11 +109,11 @@ export default function DashboardPage() {
 
                     <div className="text-center">
                         <p className="text-zinc-300 font-medium">
-                            {stats.todayCompleted ? "You've crushed it today!" : "Haven't logged progress yet."}
+                            {currentStats.todayCompleted ? "You've crushed it today!" : "Haven't logged progress yet."}
                         </p>
                     </div>
 
-                    {!stats.todayCompleted && (
+                    {!currentStats.todayCompleted && (
                         <Button size="lg" className="w-full max-w-xs transition-transform active:scale-95 shadow-lg shadow-green-900/20" onClick={() => router.push('/log')}>
                             Mark Today Complete
                         </Button>
@@ -135,7 +127,7 @@ export default function DashboardPage() {
                     className="w-full flex justify-between h-12"
                     onClick={() => router.push('/log')}
                 >
-                    <span>Log Progress as {currentId === 'user-1' ? 'Partner A' : 'Partner B'}</span>
+                    <span>Log Progress as {getUserName(currentId || 'user-1')}</span>
                     <Calendar className="h-4 w-4" />
                 </Button>
             </section>

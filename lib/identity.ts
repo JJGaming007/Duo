@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-
-export type DuoUser = 'user-1' | 'user-2'
+import { DuoUser } from './constants'
 
 export function useIdentity() {
     const [currentId, setCurrentId] = useState<DuoUser | null>(null)

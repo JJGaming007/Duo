@@ -34,6 +34,14 @@ export const streaks = pgTable('streaks', {
     updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Love Notes table
+export const loveNotes = pgTable('love_notes', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    senderId: text('sender_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
     progress: many(dailyProgress),
@@ -41,11 +49,19 @@ export const usersRelations = relations(users, ({ many, one }) => ({
         fields: [users.id],
         references: [streaks.userId],
     }),
+    loveNotes: many(loveNotes),
 }));
 
 export const dailyProgressRelations = relations(dailyProgress, ({ one }) => ({
     user: one(users, {
         fields: [dailyProgress.userId],
+        references: [users.id],
+    }),
+}));
+
+export const loveNotesRelations = relations(loveNotes, ({ one }) => ({
+    sender: one(users, {
+        fields: [loveNotes.senderId],
         references: [users.id],
     }),
 }));

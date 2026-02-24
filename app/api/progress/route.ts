@@ -11,8 +11,6 @@ export async function GET(req: Request) {
 
     if (!userId) return new NextResponse("User ID required", { status: 400 });
 
-    await seedUsers(); // Ensure users exist
-
     const progress = await db.select().from(dailyProgress).where(eq(dailyProgress.userId, userId));
     return NextResponse.json(progress);
 }
@@ -22,8 +20,6 @@ export async function POST(req: Request) {
     const { userId, courseDay, watched, practiced, projectDone, timeSpentMinutes, notes } = body;
 
     if (!userId) return new NextResponse("User ID required", { status: 400 });
-
-    await seedUsers();
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -73,9 +69,10 @@ export async function POST(req: Request) {
         }
 
         // 4. Trigger Realtime Notification
+        const { getUserName } = await import('@/lib/constants');
         await pusherServer.trigger('partner-progress', 'log-complete', {
             userId,
-            userName: userId === 'user-1' ? 'Partner A' : 'Partner B',
+            userName: getUserName(userId),
         });
 
         return NextResponse.json({ success: true });
