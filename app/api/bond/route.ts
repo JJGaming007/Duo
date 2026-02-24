@@ -5,17 +5,22 @@ import { pusherServer } from "@/lib/pusher";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET(req: Request) {
+    const { getUserName } = await import('@/lib/constants');
+
     // Fetch all love notes, ordered by newest first
-    const notes = await db.select({
+    const rawNotes = await db.select({
         id: loveNotes.id,
         content: loveNotes.content,
         createdAt: loveNotes.createdAt,
         senderId: loveNotes.senderId,
-        senderName: users.name
     }).from(loveNotes)
-        .leftJoin(users, eq(loveNotes.senderId, users.id))
         .orderBy(desc(loveNotes.createdAt))
         .limit(50); // Get last 50 notes
+
+    const notes = rawNotes.map(note => ({
+        ...note,
+        senderName: getUserName(note.senderId)
+    }));
 
     return NextResponse.json(notes);
 }
