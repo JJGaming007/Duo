@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Heart, Send, Sparkles, Gamepad2, RotateCcw } from 'lucide-react'
+import { Heart, Send, Sparkles, Gamepad2, RotateCcw, BellRing } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -35,10 +35,23 @@ export default function BondPage() {
 
         // Love Notes Channel
         const noteChannel = pusherClient.subscribe('bond-update')
+
         noteChannel.bind('new-note', (newNote: any) => {
             setLiveNotes(prev => [newNote, ...prev])
             if (newNote.senderId !== currentId) {
                 toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
+                if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+                    new Notification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
+                }
+            }
+        })
+
+        noteChannel.bind('nudge', (data: any) => {
+            if (data.senderId !== currentId) {
+                toast(`${data.senderName} nudged you! 👋`, { icon: '🔔' })
+                if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+                    new Notification('CodeTrack Duo', { body: `${data.senderName} nudged you! 👋` })
+                }
             }
         })
 
@@ -81,6 +94,20 @@ export default function BondPage() {
             toast.error("Failed to send note.")
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleNudge = async () => {
+        if (!currentId) return;
+        toast.success("Nudge sent! 👋")
+        try {
+            await fetch('/api/bond/nudge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senderId: currentId })
+            })
+        } catch (error) {
+            console.error(error)
         }
     }
 
@@ -132,12 +159,18 @@ export default function BondPage() {
 
     return (
         <div className="space-y-8 pb-[100px] animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <header className="flex flex-col gap-2">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center border border-pink-500/30">
-                        <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
+            <header className="flex flex-col gap-2 relative">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center border border-pink-500/30">
+                            <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
+                        </div>
+                        <h1 className="text-3xl font-bold tracking-tight text-white">Connect</h1>
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Connect</h1>
+                    <Button variant="outline" size="sm" onClick={handleNudge} className="gap-2 border-zinc-700 bg-zinc-900 text-zinc-300 hover:text-white hover:bg-zinc-800 shadow-lg">
+                        <BellRing className="h-4 w-4" />
+                        <span className="hidden sm:inline">Nudge Partner</span>
+                    </Button>
                 </div>
                 <p className="text-zinc-400">A special place just for the two of you.</p>
             </header>
