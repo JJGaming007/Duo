@@ -41,10 +41,33 @@ export default function BondPage() {
     }, [liveNotes, activeTab])
 
     useEffect(() => {
+        // Load from localStorage immediately
+        const savedNotes = localStorage.getItem('bond-messages')
+        const savedBoard = localStorage.getItem('bond-board')
+        const savedXIsNext = localStorage.getItem('bond-xIsNext')
+
+        if (savedNotes) setLiveNotes(JSON.parse(savedNotes))
+        if (savedBoard) setBoard(JSON.parse(savedBoard))
+        if (savedXIsNext) setXIsNext(JSON.parse(savedXIsNext))
+    }, [])
+
+    useEffect(() => {
         if (initialNotes) {
             setLiveNotes(initialNotes)
+            localStorage.setItem('bond-messages', JSON.stringify(initialNotes))
         }
     }, [initialNotes])
+
+    useEffect(() => {
+        if (liveNotes.length > 0) {
+            localStorage.setItem('bond-messages', JSON.stringify(liveNotes))
+        }
+    }, [liveNotes])
+
+    useEffect(() => {
+        localStorage.setItem('bond-board', JSON.stringify(board))
+        localStorage.setItem('bond-xIsNext', JSON.stringify(xIsNext))
+    }, [board, xIsNext])
 
     useEffect(() => {
         if (!currentId) return

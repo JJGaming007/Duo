@@ -57,23 +57,32 @@ export default function PlaygroundPage() {
 
     // Initial load from API and localStorage
     useEffect(() => {
+        // Load from localStorage immediately for instant UI
+        const savedCode = localStorage.getItem('playground-code')
+        const savedLastEditedBy = localStorage.getItem('playground-last-edited')
+
+        if (savedCode) {
+            setCode(savedCode)
+            setLineCount(savedCode.split('\n').length)
+        }
+        if (savedLastEditedBy) setLastEditedBy(savedLastEditedBy)
+
         const fetchInitialCode = async () => {
             try {
                 const res = await fetch('/api/playground')
                 const data = await res.json()
                 if (data && data.code) {
                     setCode(data.code)
-                    if (data.lastEditedBy) setLastEditedBy(getUserName(data.lastEditedBy))
-                    return
+                    setLineCount(data.code.split('\n').length)
+                    if (data.lastEditedBy) {
+                        const name = getUserName(data.lastEditedBy)
+                        setLastEditedBy(name)
+                        localStorage.setItem('playground-last-edited', name)
+                    }
+                    localStorage.setItem('playground-code', data.code)
                 }
             } catch (error) {
                 console.error('Failed to fetch initial code', error)
-            }
-
-            // Fallback to localStorage if API fails
-            const savedCode = localStorage.getItem('playground-code')
-            if (savedCode) {
-                setCode(savedCode)
             }
         }
 
@@ -129,8 +138,10 @@ export default function PlaygroundPage() {
                 if (data.type === 'sync') {
                     ignoreNextSyncRef.current = true
                     setCode(data.code)
+                    setLineCount(data.code.split('\n').length)
                     localStorage.setItem('playground-code', data.code)
                     setLastEditedBy(data.senderName)
+                    localStorage.setItem('playground-last-edited', data.senderName)
                 } else if (data.type === 'typing') {
                     setIsTyping(true)
                     setTimeout(() => setIsTyping(false), 2000)
@@ -411,28 +422,30 @@ export default function PlaygroundPage() {
                     </div>
 
                     {/* Editor Container */}
-                    <div className="flex-1 relative overflow-hidden font-mono text-[13px] md:text-[14px]">
+                    <div className="flex-1 relative overflow-hidden">
                         {/* Highlights Layer - Must exactly match textarea font/padding */}
                         <pre
                             ref={highlightsRef}
-                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden font-mono"
+                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap leading-[21px] text-[#808080] overflow-hidden font-mono text-[13px] md:text-[14px]"
                             dangerouslySetInnerHTML={{ __html: highlightCode(code) + '\n' }}
                             style={{
                                 fontVariantLigatures: 'none',
                                 MozTabSize: 4,
                                 OTabSize: 4,
                                 tabSize: 4,
+                                fontWeight: 400,
+                                letterSpacing: '0px'
                             }}
                         />
 
-                        {/* Textarea Layer */}
+                        {/* Textarea Layer - Text is transparent, only caret is visible */}
                         <textarea
                             ref={textareaRef}
                             value={code}
                             onChange={handleCodeChange}
                             onKeyDown={handleKeyDown}
                             onScroll={handleScroll}
-                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all font-mono"
+                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-transparent caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap font-mono text-[13px] md:text-[14px]"
                             placeholder="# Write your Python code here..."
                             spellCheck={false}
                             style={{
@@ -440,6 +453,8 @@ export default function PlaygroundPage() {
                                 MozTabSize: 4,
                                 OTabSize: 4,
                                 tabSize: 4,
+                                fontWeight: 400,
+                                letterSpacing: '0px'
                             }}
                         />
 
