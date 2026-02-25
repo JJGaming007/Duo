@@ -70,7 +70,7 @@ export default function BondPage() {
     // Auto-resize textarea
     const autoResize = useCallback(() => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = '36px'
+            textareaRef.current.style.height = '44px'
             textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
         }
     }, [])
@@ -180,7 +180,7 @@ export default function BondPage() {
             if (res.ok) {
                 setNote('')
                 if (textareaRef.current) {
-                    textareaRef.current.style.height = '24px'
+                    textareaRef.current.style.height = '44px'
                 }
             }
         } catch (error) {
@@ -422,7 +422,7 @@ export default function BondPage() {
                                 <div className="flex-1 flex items-center bg-zinc-800 border border-zinc-700/50 rounded-2xl px-4 min-h-[44px] focus-within:border-green-500/30 transition-colors">
                                     <textarea
                                         ref={textareaRef}
-                                        className="flex-1 bg-transparent py-2 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.4] max-h-[120px] custom-scrollbar-thin"
+                                        className="flex-1 bg-transparent py-3 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.4] max-h-[120px] overflow-y-hidden custom-scrollbar-thin"
                                         placeholder="Type a message..."
                                         rows={1}
                                         value={note}
@@ -437,7 +437,7 @@ export default function BondPage() {
                                                 handleSendNote(e)
                                             }
                                         }}
-                                        style={{ height: '36px' }}
+                                        style={{ height: '44px' }}
                                     />
                                 </div>
                                 <button
