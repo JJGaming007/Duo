@@ -3,18 +3,32 @@ import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { eq, ne } from 'drizzle-orm';
 
-// Configure web-push with VAPID keys
-webpush.setVapidDetails(
-    'mailto:codetrackduo@example.com', // change to your email
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
-);
+// Lazily configure web-push with VAPID keys (deferred so it doesn't crash at build time)
+let vapidConfigured = false;
+function ensureVapidConfigured() {
+    if (vapidConfigured) return;
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    if (!publicKey || !privateKey) {
+        console.warn('VAPID keys not set — push notifications disabled');
+        return;
+    }
+    webpush.setVapidDetails(
+        'mailto:codetrackduo@example.com',
+        publicKey,
+        privateKey,
+    );
+    vapidConfigured = true;
+}
 
 /**
  * Send a push notification to all subscriptions EXCEPT the sender's.
  */
 export async function sendPushToPartner(senderId: string, title: string, body: string, url?: string) {
     try {
+        ensureVapidConfigured();
+        if (!vapidConfigured) return { sent: 0 };
+
         // Get all subscriptions that are NOT the sender's
         const subscriptions = await db.select()
             .from(pushSubscriptions)
