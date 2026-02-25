@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, CPU } from 'lucide-react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -175,7 +175,7 @@ export default function PlaygroundPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
                     <div className="flex items-center gap-1.5">
-                        <CPU className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-yellow-500")} />
+                        <Cpu className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-yellow-500")} />
                         <span>Engine: {engineStatus === 'loading' ? 'Locating WASM Interpreter...' : engineStatus === 'ready' ? 'Pyodide 3.11 Ready' : 'Execution Error'}</span>
                     </div>
                     {lastEditedBy && (
