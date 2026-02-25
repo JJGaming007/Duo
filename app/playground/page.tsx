@@ -252,29 +252,39 @@ export default function PlaygroundPage() {
     }
 
     const highlightCode = (code: string) => {
-        // Simple but effective Python syntax highlighter
-        let highlighted = code
+        if (!code) return "";
+
+        // Escape HTML
+        let escaped = code
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
-        // Keywords
-        const keywords = ['and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield', 'print'];
-        highlighted = highlighted.replace(new RegExp(`\\b(${keywords.join('|')})\\b`, 'g'), '<span class="text-[#569cd6]">$1</span>');
+        // Single pass regex to avoid double-highlighting generated HTML
+        // Patterns: Comments, Strings, Keywords, Functions, Numbers
+        const patterns = [
+            { name: 'comment', regex: /#.*$/gm, color: '#6a9955' },
+            { name: 'string', regex: /(["'])(?:(?=(\\?))\2.)*?\1/g, color: '#ce9178' },
+            { name: 'keyword', regex: /\b(and|as|assert|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield|print)\b/g, color: '#569cd6' },
+            { name: 'function', regex: /\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\()/g, color: '#dcdcaa' },
+            { name: 'number', regex: /\b\d+\b/g, color: '#b5cea8' }
+        ];
 
-        // Functions
-        highlighted = highlighted.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\()/g, '<span class="text-[#dcdcaa]">$1</span>');
+        // Combine all patterns into one big regex with capture groups
+        const combinedRegex = new RegExp(
+            patterns.map(p => `(${p.regex.source})`).join('|'),
+            'gm'
+        );
 
-        // Strings
-        highlighted = highlighted.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="text-[#ce9178]">$1</span>');
-
-        // Comments
-        highlighted = highlighted.replace(/#.*$/gm, '<span class="text-[#6a9955]">$0</span>');
-
-        // Numbers
-        highlighted = highlighted.replace(/\b\d+\b/g, '<span class="text-[#b5cea8]">$0</span>');
-
-        return highlighted;
+        return escaped.replace(combinedRegex, (match, ...args) => {
+            // Find which group matched
+            const groups = args.slice(0, patterns.length);
+            const index = groups.findIndex(g => g !== undefined);
+            if (index !== -1) {
+                return `<span style="color: ${patterns[index].color}">${match}</span>`;
+            }
+            return match;
+        });
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
