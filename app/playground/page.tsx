@@ -3,24 +3,47 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2 } from 'lucide-react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, CPU } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
-import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import Script from 'next/script'
+
+declare global {
+    interface Window {
+        loadPyodide: any;
+    }
+}
 
 export default function PlaygroundPage() {
     const { currentId } = useIdentity()
-    const [code, setCode] = useState('print("Hello Duo! 🚀")')
+    const [code, setCode] = useState('print("Hello Duo! 🚀\\nThis is running with Pyodide WASM in your browser.")')
     const [output, setOutput] = useState('')
     const [isRunning, setIsRunning] = useState(false)
     const [isTyping, setIsTyping] = useState(false)
     const [lastEditedBy, setLastEditedBy] = useState<string | null>(null)
     const [partnerPresence, setPartnerPresence] = useState(false)
+    const [pyodide, setPyodide] = useState<any>(null)
+    const [engineStatus, setEngineStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const ignoreNextSyncRef = useRef(false)
+
+    // Load Pyodide
+    const initPyodide = async () => {
+        if (typeof window.loadPyodide === 'undefined') return;
+        try {
+            const instance = await window.loadPyodide({
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
+            });
+            setPyodide(instance);
+            setEngineStatus('ready');
+        } catch (error) {
+            console.error('Pyodide initialization failed:', error);
+            setEngineStatus('error');
+        }
+    };
 
     useEffect(() => {
         if (!currentId) return
@@ -94,21 +117,27 @@ export default function PlaygroundPage() {
     }
 
     const runCode = async () => {
+        if (!pyodide) return;
         setIsRunning(true)
         setOutput('')
+
         try {
-            const res = await fetch('/api/playground/execute', {
-                method: 'POST',
-                body: JSON.stringify({ code })
-            })
-            const data = await res.json()
-            if (data.run) {
-                setOutput(data.run.output || (data.run.stderr ? `Error: ${data.run.stderr}` : 'Code executed with no output.'))
-            } else {
-                setOutput('Failed to execute code.')
-            }
-        } catch (error) {
-            setOutput('Error connecting to execution server.')
+            // Setup stdout capturing
+            await pyodide.runPython(`
+                import sys
+                import io
+                sys.stdout = io.String()
+                sys.stderr = io.String()
+            `);
+
+            await pyodide.runPythonAsync(code);
+
+            const stdout = await pyodide.runPython("sys.stdout.getvalue()");
+            const stderr = await pyodide.runPython("sys.stderr.getvalue()");
+
+            setOutput(stdout + (stderr ? `\nError:\n${stderr}` : ''));
+        } catch (error: any) {
+            setOutput(`Error: ${error.message}`);
         } finally {
             setIsRunning(false)
         }
@@ -116,6 +145,11 @@ export default function PlaygroundPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
+            <Script
+                src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
+                onLoad={initPyodide}
+            />
+
             <header className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -139,7 +173,11 @@ export default function PlaygroundPage() {
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
+                    <div className="flex items-center gap-1.5">
+                        <CPU className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-yellow-500")} />
+                        <span>Engine: {engineStatus === 'loading' ? 'Locating WASM Interpreter...' : engineStatus === 'ready' ? 'Pyodide 3.11 Ready' : 'Execution Error'}</span>
+                    </div>
                     {lastEditedBy && (
                         <div className="flex items-center gap-1.5">
                             <User className="h-3 w-3" />
@@ -179,11 +217,11 @@ export default function PlaygroundPage() {
                     <div className="p-4 border-t border-zinc-800 bg-zinc-900/60 flex justify-end">
                         <Button
                             onClick={runCode}
-                            disabled={isRunning}
+                            disabled={isRunning || engineStatus !== 'ready'}
                             className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 px-6 shadow-lg shadow-green-900/20"
                         >
                             {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
-                            Run Code
+                            {engineStatus === 'loading' ? 'Loading Engine...' : 'Run Code'}
                         </Button>
                     </div>
                 </Card>
@@ -200,7 +238,7 @@ export default function PlaygroundPage() {
                         {isRunning ? (
                             <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>Executing on server...</span>
+                                <span>Executing via WASM...</span>
                             </div>
                         ) : output ? (
                             <pre className={cn(
