@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "CodeTrack Duo",
   },
+  icons: {
+    apple: "/icons/apple-touch-icon.png"
+  },
   formatDetection: {
     telephone: false,
   },
