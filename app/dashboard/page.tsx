@@ -32,9 +32,7 @@ export default function DashboardPage() {
                     toast(`${data.userName || 'Partner'} just completed a day! 🚀`, {
                         icon: '👏',
                     })
-                    if (document.hidden) {
-                        showOsNotification('CodeTrack Duo', { body: `${data.userName || 'Partner'} just completed a day! 🚀` })
-                    }
+                    showOsNotification('CodeTrack Duo', { body: `${data.userName || 'Partner'} just completed a day! 🚀` })
                     mutate()
                 }
             })

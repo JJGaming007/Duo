@@ -126,18 +126,14 @@ export default function BondPage() {
             if (newNote.senderId !== currentId) {
                 toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
                 setPartnerTyping(false)
-                if (document.hidden) {
-                    showOsNotification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
-                }
+                showOsNotification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
             }
         })
 
         noteChannel.bind('nudge', (data: any) => {
             if (data.senderId !== currentId) {
                 toast(`${data.senderName} nudged you! 👋`, { icon: '🔔' })
-                if (document.hidden) {
-                    showOsNotification('CodeTrack Duo', { body: `${data.senderName} nudged you! 👋` })
-                }
+                showOsNotification('CodeTrack Duo', { body: `${data.senderName} nudged you! 👋` })
             }
         })
 

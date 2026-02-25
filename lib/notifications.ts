@@ -1,7 +1,25 @@
+// Register service worker on app load
+export function registerServiceWorker() {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js', {
+                scope: '/',
+            });
+            console.log('SW registered:', registration.scope);
+        } catch (error) {
+            console.error('SW registration failed:', error);
+        }
+    });
+}
+
 export async function requestNotificationPermission() {
+    if (typeof window === 'undefined') return false;
     if (!('Notification' in window)) return false;
     if (Notification.permission === 'granted') return true;
-    
+
     try {
         const permission = await Notification.requestPermission();
         return permission === 'granted';
@@ -12,6 +30,7 @@ export async function requestNotificationPermission() {
 }
 
 export async function showOsNotification(title: string, options?: NotificationOptions) {
+    if (typeof window === 'undefined') return;
     if (!('Notification' in window)) return;
 
     if (Notification.permission !== 'granted') {
@@ -19,27 +38,34 @@ export async function showOsNotification(title: string, options?: NotificationOp
         if (!granted) return;
     }
 
-    // Try showing notification via Service Worker first (required for mobile PWAs)
+    const notifOptions: NotificationOptions = {
+        ...options,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-192x192.png',
+    };
+
+    // Try showing notification via Service Worker (required for mobile PWAs)
     if ('serviceWorker' in navigator) {
         try {
             const registration = await navigator.serviceWorker.ready;
             if (registration && registration.showNotification) {
                 await registration.showNotification(title, {
-                    ...options,
-                    badge: '/icon-192x192.png', // usually a monochrome icon for Android
-                    icon: '/icon-192x192.png',
-                });
+                    ...notifOptions,
+                    vibrate: [200, 100, 200],
+                    tag: title,
+                    renotify: true,
+                } as any);
                 return;
             }
         } catch (e) {
-            console.warn('Failed to show notification via service worker, falling back to Notification API', e);
+            console.warn('SW notification failed, falling back:', e);
         }
     }
 
-    // Fallback to standard Notification API (works on Desktop, but often not on mobile PWAs)
+    // Fallback to standard Notification API (Desktop)
     try {
-        new Notification(title, options);
+        new Notification(title, notifOptions);
     } catch (e) {
-        console.error('Failed to show standard notification', e);
+        console.error('Standard notification failed:', e);
     }
 }
