@@ -18,7 +18,7 @@ declare global {
 
 export default function PlaygroundPage() {
     const { currentId } = useIdentity()
-    const [code, setCode] = useState('print("Hello Duo! 🚀\\nThis is running with Pyodide WASM in your browser.")')
+    const [code, setCode] = useState('print("Hello Achu! 🚀")')
     const [output, setOutput] = useState('')
     const [isRunning, setIsRunning] = useState(false)
     const [isTyping, setIsTyping] = useState(false)
@@ -201,7 +201,7 @@ export default function PlaygroundPage() {
                             <div className="h-2 w-2 rounded-full bg-green-500"></div>
                             <span className="ml-2 text-[10px] font-mono text-zinc-500">main.py</span>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-white" onClick={() => setCode('print("Hello Duo! 🚀")')}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-white" onClick={() => setCode('print("Hello Achu! 🚀")')}>
                             <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
                     </CardHeader>
