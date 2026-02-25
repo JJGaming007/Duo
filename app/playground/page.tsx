@@ -32,16 +32,46 @@ export default function PlaygroundPage() {
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const ignoreNextSyncRef = useRef(false)
 
-    // Sync line numbers
     const [lineCount, setLineCount] = useState(1)
+
+    // Sync line numbers and save to localStorage
     useEffect(() => {
         setLineCount(code.split('\n').length)
+        if (code !== 'print("Hello Achu!")') {
+            localStorage.setItem('playground-code', code)
+        }
     }, [code])
+
+    // Initial load from API and localStorage
+    useEffect(() => {
+        const fetchInitialCode = async () => {
+            try {
+                const res = await fetch('/api/playground')
+                const data = await res.json()
+                if (data && data.code) {
+                    setCode(data.code)
+                    if (data.lastEditedBy) setLastEditedBy(getUserName(data.lastEditedBy))
+                    return
+                }
+            } catch (error) {
+                console.error('Failed to fetch initial code', error)
+            }
+
+            // Fallback to localStorage if API fails
+            const savedCode = localStorage.getItem('playground-code')
+            if (savedCode) {
+                setCode(savedCode)
+            }
+        }
+
+        fetchInitialCode()
+    }, [])
 
     // Load Pyodide
     const initPyodide = async () => {
-        if (typeof window.loadPyodide === 'undefined') return;
+        if (typeof window.loadPyodide === 'undefined' || pyodide) return;
         try {
+            setEngineStatus('loading');
             const instance = await window.loadPyodide({
                 indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
             });
@@ -52,6 +82,13 @@ export default function PlaygroundPage() {
             setEngineStatus('error');
         }
     };
+
+    useEffect(() => {
+        // Check if Pyodide is already loaded (e.g. after refresh or navigation)
+        if (typeof window.loadPyodide !== 'undefined' && !pyodide) {
+            initPyodide();
+        }
+    }, [pyodide]);
 
     useEffect(() => {
         if (!currentId) return
@@ -79,6 +116,7 @@ export default function PlaygroundPage() {
                 if (data.type === 'sync') {
                     ignoreNextSyncRef.current = true
                     setCode(data.code)
+                    localStorage.setItem('playground-code', data.code)
                     setLastEditedBy(data.senderName)
                 } else if (data.type === 'typing') {
                     setIsTyping(true)

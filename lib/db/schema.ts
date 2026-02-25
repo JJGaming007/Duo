@@ -42,6 +42,14 @@ export const loveNotes = pgTable('love_notes', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Playground state
+export const playground = pgTable('playground', {
+    id: text('id').primaryKey().default('default'),
+    code: text('code').notNull().default('print("Hello Achu!")'),
+    lastEditedBy: text('last_edited_by').references(() => users.id),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
     progress: many(dailyProgress),
@@ -50,6 +58,14 @@ export const usersRelations = relations(users, ({ many, one }) => ({
         references: [streaks.userId],
     }),
     loveNotes: many(loveNotes),
+    playgroundEdits: many(playground),
+}));
+
+export const playgroundRelations = relations(playground, ({ one }) => ({
+    editor: one(users, {
+        fields: [playground.lastEditedBy],
+        references: [users.id],
+    }),
 }));
 
 export const dailyProgressRelations = relations(dailyProgress, ({ one }) => ({
