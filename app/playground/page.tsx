@@ -634,7 +634,7 @@ export default function PlaygroundPage() {
                         {/* Active Line Highlight */}
                         <div
                             className="absolute left-0 right-0 h-[21px] bg-[#2a2d2e] pointer-events-none transition-all z-[1]"
-                            style={{ top: `${(activeLine - 1) * 21 + (window.innerWidth < 768 ? 16 : 20)}px` }}
+                            style={{ top: `${(activeLine - 1) * 21 + (typeof window !== 'undefined' && window.innerWidth < 768 ? 16 : 20)}px` }}
                         />
 
                         {/* Highlights Layer */}
