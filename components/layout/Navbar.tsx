@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Grid3X3, PlusCircle, BarChart3, Heart, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Grid3X3, PlusCircle, BarChart3, Heart, RefreshCw, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
@@ -15,6 +15,7 @@ const navItems = [
     { name: 'Log', href: '/log', icon: PlusCircle },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Connect', href: '/bond', icon: Heart },
+    { name: 'Playground', href: '/playground', icon: Terminal },
 ]
 
 export function Navbar() {
