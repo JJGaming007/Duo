@@ -8,6 +8,9 @@ import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
 import { cn } from '@/lib/utils'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 import Script from 'next/script'
 
 declare global {
@@ -28,6 +31,11 @@ const INDENT_TRIGGERS = ['if', 'elif', 'else', 'for', 'while', 'def', 'class', '
 export default function PlaygroundPage() {
     const { currentId } = useIdentity()
     const [code, setCode] = useState('print("Hello Achu!")')
+    const { data: serverState } = useSWR('/api/playground', fetcher, {
+        revalidateOnFocus: true,
+        revalidateOnMount: true,
+        dedupingInterval: 2000,
+    })
     const [output, setOutput] = useState('')
     const [isRunning, setIsRunning] = useState(false)
     const [isTyping, setIsTyping] = useState(false)
@@ -86,7 +94,7 @@ export default function PlaygroundPage() {
         }
     }, [code])
 
-    // Initial load from API and localStorage
+    // Load cached code from localStorage on first mount
     useEffect(() => {
         const savedCode = localStorage.getItem('playground-code')
         const savedLastEditedBy = localStorage.getItem('playground-last-edited')
@@ -96,28 +104,21 @@ export default function PlaygroundPage() {
             setLineCount(savedCode.split('\n').length)
         }
         if (savedLastEditedBy) setLastEditedBy(savedLastEditedBy)
-
-        const fetchInitialCode = async () => {
-            try {
-                const res = await fetch('/api/playground')
-                const data = await res.json()
-                if (data && data.code) {
-                    setCode(data.code)
-                    setLineCount(data.code.split('\n').length)
-                    if (data.lastEditedBy) {
-                        const name = getUserName(data.lastEditedBy)
-                        setLastEditedBy(name)
-                        localStorage.setItem('playground-last-edited', name)
-                    }
-                    localStorage.setItem('playground-code', data.code)
-                }
-            } catch (error) {
-                console.error('Failed to fetch initial code', error)
-            }
-        }
-
-        fetchInitialCode()
     }, [])
+
+    // Sync from server whenever SWR revalidates (on mount, focus, navigation)
+    useEffect(() => {
+        if (serverState && serverState.code) {
+            setCode(serverState.code)
+            setLineCount(serverState.code.split('\n').length)
+            if (serverState.lastEditedBy) {
+                const name = getUserName(serverState.lastEditedBy)
+                setLastEditedBy(name)
+                localStorage.setItem('playground-last-edited', name)
+            }
+            localStorage.setItem('playground-code', serverState.code)
+        }
+    }, [serverState])
 
     // Load Pyodide
     const initPyodide = async () => {

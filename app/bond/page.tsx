@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, Check, CheckCheck, Smile, Phone, Video, MoreVertical, Search, ArrowDown } from 'lucide-react'
+import { Loader2, User, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, RotateCcw, CheckCheck } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -268,20 +268,19 @@ export default function BondPage() {
     return (
         <div className="flex flex-col h-[calc(100dvh-7.5rem)] md:h-[750px] mx-auto max-w-5xl overflow-hidden relative">
 
-            {/* WhatsApp-Style Header */}
-            <header className="flex items-center justify-between shrink-0 px-3 md:px-4 py-2 md:py-2.5 bg-[#1f2c34] border-b border-[#2a3942] z-20">
+            {/* Header */}
+            <header className="flex items-center justify-between shrink-0 px-4 md:px-5 py-2.5 md:py-3 bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-800 z-20">
                 <div className="flex items-center gap-3">
-                    {/* Partner Avatar */}
-                    <div className="relative">
-                        <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg">
-                            {partnerName.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-[#1f2c34]" />
+                    <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-pink-900/30">
+                        {partnerName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                        <h1 className="text-[15px] md:text-base font-semibold text-white leading-tight">{partnerName}</h1>
-                        <p className="text-[11px] text-green-400 leading-tight">
-                            {partnerTyping ? 'typing...' : 'online'}
+                        <h1 className="text-[15px] md:text-base font-bold text-white leading-tight tracking-tight">{partnerName}</h1>
+                        <p className="text-[11px] leading-tight">
+                            {partnerTyping
+                                ? <span className="text-green-400 animate-pulse">typing...</span>
+                                : <span className="text-zinc-500">your partner 💕</span>
+                            }
                         </p>
                     </div>
                 </div>
@@ -290,23 +289,16 @@ export default function BondPage() {
                         variant="ghost"
                         size="icon"
                         onClick={handleNudge}
-                        className="h-9 w-9 rounded-full text-zinc-400 hover:text-white hover:bg-white/10"
+                        className="h-9 w-9 rounded-xl text-zinc-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
                         title="Send Nudge"
                     >
                         <BellRing className="h-[18px] w-[18px]" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-full text-zinc-400 hover:text-white hover:bg-white/10"
-                    >
-                        <MoreVertical className="h-[18px] w-[18px]" />
                     </Button>
                 </div>
             </header>
 
             {/* Sub Tabs */}
-            <div className="px-0 shrink-0 bg-[#1f2c34] z-10">
+            <div className="px-0 shrink-0 bg-zinc-900/60 backdrop-blur-lg border-b border-zinc-800/50 z-10">
                 <div className="flex relative">
                     <button
                         onClick={() => setActiveTab('messages')}
@@ -315,8 +307,8 @@ export default function BondPage() {
                             activeTab === 'messages' ? "text-green-400" : "text-zinc-500 hover:text-zinc-300"
                         )}
                     >
-                        <MessageCircle className={cn("h-3.5 w-3.5", activeTab === 'messages' && "fill-green-400/10")} />
-                        Chats
+                        <MessageCircle className={cn("h-3.5 w-3.5", activeTab === 'messages' && "fill-green-400/20")} />
+                        Messages
                     </button>
                     <button
                         onClick={() => setActiveTab('games')}
@@ -325,13 +317,13 @@ export default function BondPage() {
                             activeTab === 'games' ? "text-green-400" : "text-zinc-500 hover:text-zinc-300"
                         )}
                     >
-                        <Gamepad2 className={cn("h-3.5 w-3.5", activeTab === 'games' && "fill-green-400/10")} />
+                        <Gamepad2 className={cn("h-3.5 w-3.5", activeTab === 'games' && "fill-green-400/20")} />
                         Games
                     </button>
                     {/* Active tab indicator */}
                     <div
                         className={cn(
-                            "absolute bottom-0 h-[3px] w-1/2 bg-green-400 rounded-t-full transition-all duration-300 ease-out",
+                            "absolute bottom-0 h-[2px] w-1/2 bg-green-500 rounded-t-full transition-all duration-300 ease-out",
                             activeTab === 'games' ? "translate-x-full" : "translate-x-0"
                         )}
                     />
@@ -342,14 +334,10 @@ export default function BondPage() {
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {activeTab === 'messages' ? (
                     <>
-                        {/* Chat Background + Messages */}
+                        {/* Chat Messages */}
                         <div
                             ref={messageContainerRef}
-                            className="flex-1 overflow-y-auto px-3 md:px-4 py-3 custom-scrollbar"
-                            style={{
-                                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                                backgroundColor: '#0b141a'
-                            }}
+                            className="flex-1 overflow-y-auto px-3 md:px-4 py-3 custom-scrollbar bg-zinc-950/50"
                         >
                             <div className="max-w-3xl mx-auto w-full space-y-1">
                                 {/* Date-grouped messages */}
@@ -357,8 +345,8 @@ export default function BondPage() {
                                     <div key={gi}>
                                         {/* Date Separator */}
                                         <div className="flex items-center justify-center my-3">
-                                            <div className="bg-[#182229] px-3 py-1 rounded-lg shadow-sm">
-                                                <span className="text-[11px] text-zinc-400 font-medium uppercase">
+                                            <div className="bg-zinc-800/80 backdrop-blur-sm px-3 py-1 rounded-full border border-zinc-700/50">
+                                                <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">
                                                     {formatMessageDate(group.date)}
                                                 </span>
                                             </div>
@@ -375,55 +363,35 @@ export default function BondPage() {
                                                     className={cn(
                                                         "flex w-full",
                                                         isMine ? "justify-end" : "justify-start",
-                                                        isConsecutive ? "mt-[2px]" : "mt-2"
+                                                        isConsecutive ? "mt-[3px]" : "mt-2.5"
                                                     )}
                                                 >
-                                                    <div className={cn(
-                                                        "relative max-w-[80%] md:max-w-[65%] group",
-                                                    )}>
+                                                    <div className="relative max-w-[80%] md:max-w-[65%]">
                                                         {/* Sender Name (only for partner, first in group) */}
                                                         {!isMine && !isConsecutive && (
-                                                            <p className="text-[11px] text-pink-400 font-medium mb-0.5 ml-1">
+                                                            <p className="text-[11px] text-pink-400 font-semibold mb-1 ml-3">
                                                                 {n.senderName || partnerName}
                                                             </p>
                                                         )}
 
                                                         {/* Message Bubble */}
                                                         <div className={cn(
-                                                            "relative px-3 py-1.5 md:px-3.5 md:py-2 shadow-sm",
+                                                            "relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-2xl shadow-sm",
                                                             isMine
-                                                                ? "bg-[#005c4b] rounded-lg"
-                                                                : "bg-[#1f2c34] rounded-lg",
-                                                            !isConsecutive && isMine && "rounded-tr-none",
-                                                            !isConsecutive && !isMine && "rounded-tl-none"
+                                                                ? "bg-green-600/15 border border-green-500/20 rounded-br-md"
+                                                                : "bg-zinc-800/80 border border-zinc-700/40 rounded-bl-md"
                                                         )}>
-                                                            {/* Bubble tail */}
-                                                            {!isConsecutive && (
-                                                                <div className={cn(
-                                                                    "absolute top-0 w-3 h-3 overflow-hidden",
-                                                                    isMine ? "-right-[6px]" : "-left-[6px]"
-                                                                )}>
-                                                                    <div className={cn(
-                                                                        "absolute w-3 h-3 transform rotate-45",
-                                                                        isMine
-                                                                            ? "bg-[#005c4b] -translate-x-1.5"
-                                                                            : "bg-[#1f2c34] translate-x-1.5"
-                                                                    )} />
-                                                                </div>
-                                                            )}
-
                                                             {/* Content + Timestamp */}
                                                             <div className="flex items-end gap-2">
-                                                                <p className="text-[14px] md:text-[15px] text-zinc-100 whitespace-pre-wrap leading-[1.35] flex-1 break-words">
+                                                                <p className="text-[14px] md:text-[15px] text-zinc-100 whitespace-pre-wrap leading-[1.4] flex-1 break-words">
                                                                     {n.content}
                                                                 </p>
                                                                 <div className="flex items-center gap-0.5 shrink-0 -mb-0.5 ml-1">
-                                                                    <span className="text-[10px] text-zinc-400/70 leading-none">
+                                                                    <span className="text-[10px] text-zinc-500 leading-none">
                                                                         {formatTime(n.createdAt)}
                                                                     </span>
-                                                                    {/* Read receipts (only for sent messages) */}
                                                                     {isMine && (
-                                                                        <CheckCheck className="h-3.5 w-3.5 text-blue-400 ml-0.5" />
+                                                                        <CheckCheck className="h-3.5 w-3.5 text-green-400 ml-0.5" />
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -437,15 +405,12 @@ export default function BondPage() {
 
                                 {/* Typing Indicator */}
                                 {partnerTyping && (
-                                    <div className="flex justify-start mt-2">
-                                        <div className="bg-[#1f2c34] rounded-lg rounded-tl-none px-4 py-3 shadow-sm relative">
-                                            <div className="absolute top-0 -left-[6px] w-3 h-3 overflow-hidden">
-                                                <div className="absolute w-3 h-3 transform rotate-45 bg-[#1f2c34] translate-x-1.5" />
-                                            </div>
+                                    <div className="flex justify-start mt-2.5">
+                                        <div className="bg-zinc-800/80 border border-zinc-700/40 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                                             <div className="flex gap-1 items-center">
-                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                             </div>
                                         </div>
                                     </div>
@@ -455,27 +420,20 @@ export default function BondPage() {
                             </div>
                         </div>
 
-                        {/* WhatsApp-Style Input Bar */}
-                        <div className="px-2 md:px-3 py-1.5 md:py-2 bg-[#1f2c34] border-t border-[#2a3942] shrink-0 safe-pb">
+                        {/* Input Bar */}
+                        <div className="px-2 md:px-3 py-2 md:py-2.5 bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-800 shrink-0 safe-pb">
                             <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto items-end">
-                                <div className="flex-1 flex items-end bg-[#2a3942] rounded-3xl px-3 md:px-4 py-1 min-h-[44px]">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-zinc-400 hover:text-white shrink-0 mb-0.5"
-                                    >
-                                        <Smile className="h-5 w-5" />
-                                    </Button>
+                                <div className="flex-1 flex items-end bg-zinc-800 border border-zinc-700/50 rounded-2xl px-4 py-1 min-h-[44px] focus-within:border-green-500/30 transition-colors">
                                     <textarea
                                         ref={textareaRef}
                                         className="flex-1 bg-transparent py-2.5 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.3] max-h-[120px] custom-scrollbar-thin"
-                                        placeholder="Message"
+                                        placeholder="Type a message..."
                                         rows={1}
                                         value={note}
                                         onChange={(e) => {
                                             setNote(e.target.value)
                                             autoResize()
+                                            handleTyping()
                                         }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -490,29 +448,29 @@ export default function BondPage() {
                                     type="submit"
                                     disabled={isSubmitting || !note.trim()}
                                     className={cn(
-                                        "h-[44px] w-[44px] rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90",
+                                        "h-[44px] w-[44px] rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90",
                                         note.trim()
-                                            ? "bg-green-600 hover:bg-green-500 shadow-lg shadow-green-500/20"
-                                            : "bg-green-600/50 cursor-not-allowed"
+                                            ? "bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/30"
+                                            : "bg-zinc-800 border border-zinc-700/50 cursor-not-allowed"
                                     )}
                                 >
                                     {isSubmitting
                                         ? <Loader2 className="h-5 w-5 text-white animate-spin" />
-                                        : <Send className="h-5 w-5 text-white ml-0.5" />
+                                        : <Send className={cn("h-5 w-5 ml-0.5", note.trim() ? "text-white" : "text-zinc-600")} />
                                     }
                                 </button>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto custom-scrollbar-thin" style={{ backgroundColor: '#0b141a' }}>
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto custom-scrollbar-thin bg-zinc-950/50">
                         <div className="w-full max-w-[320px] md:max-w-sm space-y-6 md:space-y-8 py-4">
                             <div className="flex items-center justify-between text-zinc-400">
                                 <div className="flex items-center gap-2">
                                     <div className={cn("h-1.5 w-1.5 rounded-full", xIsNext ? "bg-blue-500 animate-pulse" : "bg-zinc-800")} />
                                     <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Player X</span>
                                 </div>
-                                <span className="text-[9px] font-black text-zinc-800">VS</span>
+                                <span className="text-[9px] font-black text-zinc-700">VS</span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[9px] font-black uppercase tracking-widest opacity-60 text-right">Player O</span>
                                     <div className={cn("h-1.5 w-1.5 rounded-full", !xIsNext ? "bg-pink-500 animate-pulse" : "bg-zinc-800")} />
@@ -526,8 +484,8 @@ export default function BondPage() {
                                         onClick={() => handlePlay(i)}
                                         disabled={!!square || !!winner || !isMyTurn}
                                         className={cn(
-                                            "aspect-square bg-[#1f2c34] rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black transition-all duration-300 border border-[#2a3942]",
-                                            !square && isMyTurn && !winner ? "hover:bg-[#2a3942] cursor-pointer shadow-lg" : "cursor-default",
+                                            "aspect-square bg-zinc-800/80 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black transition-all duration-300 border border-zinc-700/50",
+                                            !square && isMyTurn && !winner ? "hover:bg-zinc-700/80 cursor-pointer shadow-lg" : "cursor-default",
                                             square === 'X' ? "text-blue-500" : "",
                                             square === 'O' ? "text-pink-500" : ""
                                         )}
@@ -560,7 +518,7 @@ export default function BondPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleResetGame}
-                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-[#2a3942] text-[8px] font-black uppercase tracking-widest transition-all h-8"
+                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-zinc-800 text-[8px] font-black uppercase tracking-widest transition-all h-8"
                                 >
                                     <RotateCcw className="h-2.5 w-2.5 md:h-3 md:w-3" />
                                     Reset Game

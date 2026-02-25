@@ -38,9 +38,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} bg-black text-zinc-100 antialiased min-h-screen pt-14 pb-16 md:pb-0 md:pt-16 overflow-x-hidden`}>
+      <body className={`${inter.className} bg-black text-zinc-100 antialiased h-[100dvh] pt-14 pb-16 md:pb-0 md:pt-16 overflow-hidden flex flex-col`}>
         <Navbar />
-        <main className="mx-auto max-w-7xl">
+        <main className="mx-auto max-w-7xl flex-1 overflow-y-auto overflow-x-hidden w-full">
           {children}
         </main>
         <ToastProvider />
