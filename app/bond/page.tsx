@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Heart, Send, Sparkles, Gamepad2, RotateCcw, BellRing } from 'lucide-react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing } from 'lucide-react'
+import { useRef } from 'react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -21,9 +22,20 @@ export default function BondPage() {
     const { data: initialNotes, mutate } = useSWR('/api/bond', fetcher)
     const [liveNotes, setLiveNotes] = useState<any[]>([])
 
-    // Tic-Tac-Toe state
     const [board, setBoard] = useState(Array(9).fill(null))
     const [xIsNext, setXIsNext] = useState(true)
+    const [activeTab, setActiveTab] = useState<'messages' | 'games'>('messages')
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+        if (activeTab === 'messages' && liveNotes.length > 0) {
+            scrollToBottom()
+        }
+    }, [liveNotes, activeTab])
 
     useEffect(() => {
         if (initialNotes) {
@@ -161,151 +173,178 @@ export default function BondPage() {
     }
 
     return (
-        <div className="space-y-8 pb-[100px]">
-            <header className="flex flex-col gap-2 relative">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center border border-pink-500/30">
-                            <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
-                        </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white">Connect</h1>
+        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] space-y-4 max-w-5xl mx-auto">
+            <header className="flex items-center justify-between shrink-0 px-1">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20">
+                        <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleNudge} className="gap-2 border-zinc-700 bg-zinc-900 text-zinc-300 hover:text-white hover:bg-zinc-800 shadow-lg">
-                        <BellRing className="h-4 w-4" />
-                        <span className="hidden sm:inline">Nudge Partner</span>
-                    </Button>
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">Connect</h1>
+                        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest font-bold">Bonding Space</p>
+                    </div>
                 </div>
-                <p className="text-zinc-400">A special place just for the two of you.</p>
+                <Button variant="ghost" size="icon" onClick={handleNudge} className="h-10 w-10 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800">
+                    <BellRing className="h-4 w-4" />
+                </Button>
             </header>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* Sub Tabs */}
+            <div className="flex p-1 bg-zinc-900/50 rounded-xl border border-zinc-800/50 shrink-0">
+                <button
+                    onClick={() => setActiveTab('messages')}
+                    className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
+                        activeTab === 'messages' ? "bg-zinc-800 text-pink-400 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                >
+                    <MessageCircle className="h-4 w-4" />
+                    Messages
+                </button>
+                <button
+                    onClick={() => setActiveTab('games')}
+                    className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
+                        activeTab === 'games' ? "bg-zinc-800 text-blue-400 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                >
+                    <Gamepad2 className="h-4 w-4" />
+                    Games
+                </button>
+            </div>
 
-                {/* Love Notes Section */}
-                <div className="space-y-6">
-                    <Card className="border-pink-900/40 bg-pink-950/10 shadow-lg shadow-pink-900/10">
-                        <CardHeader>
-                            <CardTitle className="text-xl flex items-center gap-2">
-                                <Sparkles className="h-5 w-5 text-pink-400" />
-                                Leave a Note
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSendNote} className="space-y-4">
-                                <textarea
-                                    className="flex w-full rounded-xl border border-pink-900/50 bg-pink-950/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 min-h-[100px] transition-all resize-none shadow-inner"
-                                    placeholder="Write something sweet..."
-                                    value={note}
-                                    onChange={(e) => setNote(e.target.value)}
-                                    maxLength={280}
-                                />
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-zinc-500">{note.length}/280</span>
-                                    <Button
-                                        className="bg-pink-600 hover:bg-pink-700 text-white gap-2 shadow-lg shadow-pink-900/50"
-                                        disabled={isSubmitting || !note.trim()}
-                                    >
-                                        <Send className="h-4 w-4" />
-                                        Send Note
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-
-                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                        {liveNotes.map((n: any) => (
-                            <Card key={n.id} className={cn(
-                                "border-zinc-800 transition-all duration-300",
-                                n.senderId === currentId ? "bg-zinc-900/60 ml-8" : "bg-zinc-900/30 mr-8"
-                            )}>
-                                <CardContent className="p-4 space-y-2">
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className={cn(
-                                            "font-bold",
-                                            n.senderId === currentId ? "text-pink-400" : "text-blue-400"
-                                        )}>
-                                            {n.senderName}
-                                        </span>
-                                        <span className="text-zinc-500">
-                                            {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-zinc-300 whitespace-pre-wrap">{n.content}</p>
-                                </CardContent>
-                            </Card>
-                        ))}
-                        {!liveNotes.length && (
-                            <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-                                No notes yet. Be the first to say hi! 👋
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Tic Tac Toe Section */}
-                <Card className="border-blue-900/30 bg-blue-950/10 sticky top-24 self-start">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-xl flex items-center gap-2">
-                            <Gamepad2 className="h-5 w-5 text-blue-400" />
-                            Tic-Tac-Toe
-                        </CardTitle>
-                        <Button variant="ghost" size="icon" onClick={handleResetGame} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
-                            <RotateCcw className="h-4 w-4" />
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center gap-6">
-
-                        <div className="flex items-center gap-4 text-sm font-medium">
-                            <div className={cn("px-4 py-2 rounded-xl transition-all", xIsNext ? "bg-blue-600 shadow-lg shadow-blue-900/50" : "bg-zinc-900 text-zinc-500")}>
-                                Player X
-                            </div>
-                            <span className="text-zinc-600 font-bold">VS</span>
-                            <div className={cn("px-4 py-2 rounded-xl transition-all", !xIsNext ? "bg-pink-600 shadow-lg shadow-pink-900/50" : "bg-zinc-900 text-zinc-500")}>
-                                Player O
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 w-full max-w-[300px] aspect-square bg-zinc-800 p-2 rounded-2xl shadow-inner">
-                            {board.map((square, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handlePlay(i)}
-                                    disabled={square || winner || !isMyTurn}
+            <Card className="flex-1 flex flex-col bg-zinc-950/40 border-zinc-800/50 overflow-hidden relative shadow-2xl">
+                {activeTab === 'messages' ? (
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {/* Chat Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+                            {liveNotes.slice().reverse().map((n: any) => (
+                                <div
+                                    key={n.id}
                                     className={cn(
-                                        "h-full w-full bg-zinc-900 rounded-xl flex items-center justify-center text-5xl font-black transition-all duration-300",
-                                        !square && isMyTurn && !winner ? "hover:bg-zinc-700 cursor-pointer" : "cursor-default",
-                                        square === 'X' ? "text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]" : "",
-                                        square === 'O' ? "text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.3)]" : ""
+                                        "flex flex-col max-w-[85%] md:max-w-[70%]",
+                                        n.senderId === currentId ? "ml-auto items-end" : "items-start"
                                     )}
                                 >
-                                    {square && <span className="duration-300">{square}</span>}
-                                </button>
+                                    <div className={cn(
+                                        "px-4 py-2.5 rounded-2xl text-sm shadow-sm transition-all",
+                                        n.senderId === currentId
+                                            ? "bg-pink-600 text-white rounded-br-none"
+                                            : "bg-zinc-800 text-zinc-100 rounded-bl-none border border-zinc-700/50"
+                                    )}>
+                                        <p className="whitespace-pre-wrap leading-relaxed">{n.content}</p>
+                                    </div>
+                                    <span className="text-[10px] text-zinc-500 mt-1.5 px-1 font-medium">
+                                        {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
                             ))}
-                        </div>
+                            <div ref={messagesEndRef} />
 
-                        <div className="h-8 flex items-center justify-center">
-                            {winner ? (
-                                <span className="text-lg font-bold text-green-400 animate-bounce">
-                                    Player {winner} Wins! 🏆
-                                </span>
-                            ) : isDraw ? (
-                                <span className="text-lg font-bold text-zinc-400">
-                                    It&apos;s a Draw! 🤝
-                                </span>
-                            ) : (
-                                <span className={cn(
-                                    "text-sm",
-                                    isMyTurn ? "text-green-400 font-bold" : "text-zinc-500"
-                                )}>
-                                    {isMyTurn ? "Your turn!" : "Waiting for partner..."}
-                                </span>
+                            {!liveNotes.length && (
+                                <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-3 opacity-50">
+                                    <Sparkles className="h-10 w-10" />
+                                    <p className="text-xs font-medium uppercase tracking-widest">No messages yet. Say something sweet!</p>
+                                </div>
                             )}
                         </div>
 
-                    </CardContent>
-                </Card>
+                        {/* Sticky Input */}
+                        <div className="p-4 bg-zinc-950/60 border-t border-zinc-800/50 backdrop-blur-md shrink-0">
+                            <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto">
+                                <div className="flex-1 relative">
+                                    <textarea
+                                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl py-3 px-4 pr-12 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-pink-500/30 transition-all resize-none h-12 flex items-center"
+                                        placeholder="Type a message..."
+                                        value={note}
+                                        onChange={(e) => setNote(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSendNote(e)
+                                            }
+                                        }}
+                                        maxLength={280}
+                                    />
+                                    <div className="absolute right-3 bottom-3 text-[10px] text-zinc-700 font-bold">
+                                        {note.length}/280
+                                    </div>
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting || !note.trim()}
+                                    className="bg-pink-600 hover:bg-pink-700 text-white rounded-2xl w-12 h-12 p-0 shrink-0 shadow-lg shadow-pink-900/20 active:scale-95 transition-all"
+                                >
+                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                                </Button>
+                            </form>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.05)_0,rgba(0,0,0,0)_70%)]">
+                        <div className="w-full max-w-sm space-y-8">
+                            <div className="flex items-center justify-between text-zinc-400">
+                                <div className="flex items-center gap-2">
+                                    <div className={cn("h-2.5 w-2.5 rounded-full", xIsNext ? "bg-blue-500 animate-pulse" : "bg-zinc-800")} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Player X</span>
+                                </div>
+                                <span className="text-xs font-black text-zinc-700">VS</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking_widest text-right">Player O</span>
+                                    <div className={cn("h-2.5 w-2.5 rounded-full", !xIsNext ? "bg-pink-500 animate-pulse" : "bg-zinc-800")} />
+                                </div>
+                            </div>
 
-            </div>
+                            <div className="grid grid-cols-3 gap-3 aspect-square">
+                                {board.map((square, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handlePlay(i)}
+                                        disabled={square || winner || !isMyTurn}
+                                        className={cn(
+                                            "aspect-square bg-zinc-900 rounded-2xl flex items-center justify-center text-4xl md:text-5xl font-black transition-all duration-300 border border-zinc-800/50 shadow-lg",
+                                            !square && isMyTurn && !winner ? "hover:bg-zinc-800/80 cursor-pointer border-green-500/20" : "cursor-default",
+                                            square === 'X' ? "text-blue-500 shadow-[inset_0_0_20px_rgba(59,130,246,0.1)]" : "",
+                                            square === 'O' ? "text-pink-500 shadow-[inset_0_0_20px_rgba(236,72,153,0.1)]" : ""
+                                        )}
+                                    >
+                                        {square}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="h-10 flex items-center justify-center">
+                                    {winner ? (
+                                        <div className="px-6 py-2 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 font-black uppercase tracking-widest text-sm animate-bounce">
+                                            Winner: {winner} 🏆
+                                        </div>
+                                    ) : isDraw ? (
+                                        <div className="px-6 py-2 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-black uppercase tracking-widest text-sm">
+                                            It&apos;s a Draw! 🤝
+                                        </div>
+                                    ) : (
+                                        <div className={cn(
+                                            "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em]",
+                                            isMyTurn ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-zinc-900 text-zinc-600 border border-zinc-800"
+                                        )}>
+                                            {isMyTurn ? "Your Turn" : "Waiting..."}
+                                        </div>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleResetGame}
+                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-zinc-900 text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Reset Game
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Card>
         </div>
     )
 }
