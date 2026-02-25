@@ -1,31 +1,38 @@
 // Service Worker for CodeTrack Duo PWA
-// Handles push notifications and basic caching
+// Handles Web Push notifications and notification clicks
 
 const CACHE_NAME = 'codetrack-duo-v1';
 
-// Install event
+// Install — activate immediately
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// Activate event
+// Activate — claim clients immediately
 self.addEventListener('activate', (event) => {
     event.waitUntil(clients.claim());
 });
 
-// Listen for push events (for future Web Push support)
+// Handle incoming push notifications (works even when app is closed!)
 self.addEventListener('push', (event) => {
-    const data = event.data ? event.data.json() : {};
+    let data = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        data = { title: 'CodeTrack Duo', body: event.data ? event.data.text() : 'New notification' };
+    }
+
     const title = data.title || 'CodeTrack Duo';
     const options = {
         body: data.body || 'You have a new notification',
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-192x192.png',
         vibrate: [200, 100, 200],
-        tag: data.tag || 'default',
+        tag: data.tag || 'codetrack-' + Date.now(),
         renotify: true,
+        requireInteraction: false,
         data: {
-            url: data.url || '/',
+            url: data.url || '/bond',
         },
     };
 
@@ -38,13 +45,14 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const urlToOpen = event.notification.data?.url || '/';
+    const urlToOpen = event.notification.data?.url || '/bond';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // If the app is already open, focus it
+            // If the app is already open, focus it and navigate
             for (const client of clientList) {
                 if (client.url.includes(self.location.origin) && 'focus' in client) {
+                    client.navigate(urlToOpen);
                     return client.focus();
                 }
             }
@@ -54,8 +62,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-// Simple fetch pass-through (no aggressive caching to avoid stale data issues)
+// Simple fetch pass-through (no aggressive caching)
 self.addEventListener('fetch', (event) => {
-    // Just pass through — don't cache API calls or dynamic content
     return;
 });

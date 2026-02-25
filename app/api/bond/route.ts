@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
-import { loveNotes, users } from "@/lib/db/schema";
+import { loveNotes } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 import { pusherServer } from "@/lib/pusher";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
+import { sendPushToPartner } from "@/lib/webpush";
 
 export async function GET(req: Request) {
     const { getUserName } = await import('@/lib/constants');
 
-    // Fetch all love notes, ordered by newest first
     const rawNotes = await db.select({
         id: loveNotes.id,
         content: loveNotes.content,
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
         senderId: loveNotes.senderId,
     }).from(loveNotes)
         .orderBy(desc(loveNotes.createdAt))
-        .limit(50); // Get last 50 notes
+        .limit(50);
 
     const notes = rawNotes.map(note => ({
         ...note,
@@ -39,11 +39,11 @@ export async function POST(req: Request) {
             content
         }).returning();
 
-        // 2. Get sender name for the notification
+        // 2. Get sender name
         const { getUserName } = await import('@/lib/constants');
         const senderName = getUserName(senderId);
 
-        // 3. Trigger Realtime Notification
+        // 3. Realtime notification (in-app via Pusher)
         await pusherServer.trigger('bond-update', 'new-note', {
             id: newNote.id,
             content: newNote.content,
@@ -51,6 +51,14 @@ export async function POST(req: Request) {
             senderName,
             createdAt: newNote.createdAt
         });
+
+        // 4. Web Push to partner (works when app is closed)
+        await sendPushToPartner(
+            senderId,
+            `💌 ${senderName}`,
+            content.substring(0, 200),
+            '/bond'
+        );
 
         return NextResponse.json({ success: true, note: newNote });
     } catch (error: any) {

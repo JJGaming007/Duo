@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ToastProvider from "@/components/providers/ToastProvider";
+import NotificationProvider from "@/components/providers/NotificationProvider";
 import { Navbar } from "@/components/layout/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -44,6 +45,7 @@ export default function RootLayout({
           {children}
         </main>
         <ToastProvider />
+        <NotificationProvider />
       </body>
     </html>
   );

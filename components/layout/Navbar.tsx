@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { useEffect } from 'react'
-import { requestNotificationPermission, registerServiceWorker } from '@/lib/notifications'
+import { requestNotificationPermission } from '@/lib/notifications'
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -22,9 +22,6 @@ export function Navbar() {
     const pathname = usePathname()
     const { currentId, switchUser } = useIdentity()
 
-    useEffect(() => {
-        registerServiceWorker()
-    }, [])
 
     return (
         <>
