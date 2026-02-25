@@ -70,7 +70,7 @@ export default function BondPage() {
     // Auto-resize textarea
     const autoResize = useCallback(() => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = '24px'
+            textareaRef.current.style.height = '36px'
             textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
         }
     }, [])
@@ -419,10 +419,10 @@ export default function BondPage() {
                         {/* Input Bar */}
                         <div className="px-2 md:px-3 py-2 md:py-2.5 bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-800 shrink-0 safe-pb">
                             <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto items-end">
-                                <div className="flex-1 flex items-end bg-zinc-800 border border-zinc-700/50 rounded-2xl px-4 py-1 min-h-[44px] focus-within:border-green-500/30 transition-colors">
+                                <div className="flex-1 flex items-center bg-zinc-800 border border-zinc-700/50 rounded-2xl px-4 min-h-[44px] focus-within:border-green-500/30 transition-colors">
                                     <textarea
                                         ref={textareaRef}
-                                        className="flex-1 bg-transparent py-2.5 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.3] max-h-[120px] custom-scrollbar-thin"
+                                        className="flex-1 bg-transparent py-2 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.4] max-h-[120px] custom-scrollbar-thin"
                                         placeholder="Type a message..."
                                         rows={1}
                                         value={note}
@@ -437,7 +437,7 @@ export default function BondPage() {
                                                 handleSendNote(e)
                                             }
                                         }}
-                                        style={{ height: '24px' }}
+                                        style={{ height: '36px' }}
                                     />
                                 </div>
                                 <button
