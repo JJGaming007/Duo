@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing } from 'lucide-react'
-import { useRef } from 'react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, Check, CheckCheck, Smile, Phone, Video, MoreVertical, Search, ArrowDown } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -15,20 +14,68 @@ import { showOsNotification, requestNotificationPermission } from '@/lib/notific
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
+// Date formatting helpers
+const formatMessageDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (date.toDateString() === today.toDateString()) return 'Today'
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+// Group messages by date
+const groupMessagesByDate = (messages: any[]) => {
+    const groups: { date: string; messages: any[] }[] = []
+    let currentDate = ''
+
+    // Messages come newest-first, reverse for grouping then reverse back
+    const sorted = [...messages].reverse()
+
+    sorted.forEach(msg => {
+        const msgDate = new Date(msg.createdAt).toDateString()
+        if (msgDate !== currentDate) {
+            currentDate = msgDate
+            groups.push({ date: msg.createdAt, messages: [msg] })
+        } else {
+            groups[groups.length - 1].messages.push(msg)
+        }
+    })
+
+    return groups
+}
+
 export default function BondPage() {
     const { currentId } = useIdentity()
     const [note, setNote] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { data: initialNotes, mutate } = useSWR('/api/bond', fetcher)
     const [liveNotes, setLiveNotes] = useState<any[]>([])
+    const [partnerTyping, setPartnerTyping] = useState(false)
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     const [board, setBoard] = useState(Array(9).fill(null))
     const [xIsNext, setXIsNext] = useState(true)
     const [activeTab, setActiveTab] = useState<'messages' | 'games'>('messages')
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const messageContainerRef = useRef<HTMLDivElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Auto-resize textarea
+    const autoResize = useCallback(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '24px'
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
+        }
+    }, [])
 
     const scrollToBottom = () => {
-        // With flex-col-reverse, we just scroll to the container's bottom (which is visually the end)
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
         }
@@ -40,8 +87,8 @@ export default function BondPage() {
         }
     }, [liveNotes, activeTab])
 
+    // Load from localStorage immediately
     useEffect(() => {
-        // Load from localStorage immediately
         const savedNotes = localStorage.getItem('bond-messages')
         const savedBoard = localStorage.getItem('bond-board')
         const savedXIsNext = localStorage.getItem('bond-xIsNext')
@@ -72,14 +119,13 @@ export default function BondPage() {
     useEffect(() => {
         if (!currentId) return
 
-        // Love Notes Channel
         const noteChannel = pusherClient.subscribe('bond-update')
 
         noteChannel.bind('new-note', (newNote: any) => {
-            // Add to the list (note: ordering is handled by flex-col-reverse in UI)
             setLiveNotes(prev => [newNote, ...prev])
             if (newNote.senderId !== currentId) {
                 toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
+                setPartnerTyping(false)
                 if (document.hidden) {
                     showOsNotification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
                 }
@@ -95,7 +141,14 @@ export default function BondPage() {
             }
         })
 
-        // Tic Tac Toe Channel
+        noteChannel.bind('typing', (data: any) => {
+            if (data.senderId !== currentId) {
+                setPartnerTyping(true)
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+                typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
+            }
+        })
+
         const tttChannel = pusherClient.subscribe('bond-tictactoe')
         tttChannel.bind('game-update', (data: any) => {
             if (data.type === 'move') {
@@ -130,12 +183,24 @@ export default function BondPage() {
             })
             if (res.ok) {
                 setNote('')
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = '24px'
+                }
             }
         } catch (error) {
             toast.error("Failed to send note.")
         } finally {
             setIsSubmitting(false)
         }
+    }
+
+    const handleTyping = () => {
+        if (!currentId) return
+        fetch('/api/bond/nudge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentId, type: 'typing' })
+        }).catch(() => { })
     }
 
     const handleNudge = async () => {
@@ -155,9 +220,9 @@ export default function BondPage() {
 
     const checkWinner = (squares: any[]) => {
         const lines = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
-            [0, 4, 8], [2, 4, 6] // diagonals
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
         ]
         for (let i = 0; i < lines.length; i++) {
             const [a, b, c] = lines[i]
@@ -179,11 +244,9 @@ export default function BondPage() {
         newBoard[i] = xIsNext ? 'X' : 'O'
         const nextXIsNext = !xIsNext
 
-        // Optimistic update
         setBoard(newBoard)
         setXIsNext(nextXIsNext)
 
-        // Broadcast move
         await fetch('/api/bond/tictactoe', {
             method: 'POST',
             body: JSON.stringify({ type: 'move', board: newBoard, xIsNext: nextXIsNext, senderId: currentId })
@@ -199,133 +262,250 @@ export default function BondPage() {
         })
     }
 
+    const messageGroups = groupMessagesByDate(liveNotes)
+    const partnerName = currentId === 'user-1' ? getUserName('user-2') : getUserName('user-1')
+
     return (
-        /* 
-           h-[calc(100dvh-7.5rem)] ensures the container fits between the root layout header and bottom navigation.
-           Using overflow-hidden here and flex-1 overflow-y-auto on the message list creates the fixed header/footer effect.
-        */
         <div className="flex flex-col h-[calc(100dvh-7.5rem)] md:h-[750px] mx-auto max-w-5xl overflow-hidden relative">
-            {/* 1. Fixed Header (Shrink-0 prevents it from scrolling) */}
-            <header className="flex items-center justify-between shrink-0 px-4 py-2.5 md:py-3 bg-zinc-950/40 backdrop-blur-md border-b border-zinc-900/50 z-20">
-                <div className="flex items-center gap-2.5 md:gap-3">
-                    <div className="h-8 w-8 md:h-9 md:w-9 rounded-lg md:rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shadow-inner">
-                        <Heart className="h-4 w-4 md:h-4.5 md:w-4.5 text-pink-500 fill-pink-500/20" />
+
+            {/* WhatsApp-Style Header */}
+            <header className="flex items-center justify-between shrink-0 px-3 md:px-4 py-2 md:py-2.5 bg-[#1f2c34] border-b border-[#2a3942] z-20">
+                <div className="flex items-center gap-3">
+                    {/* Partner Avatar */}
+                    <div className="relative">
+                        <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg">
+                            {partnerName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-[#1f2c34]" />
                     </div>
                     <div>
-                        <h1 className="text-base md:text-xl font-bold tracking-tight text-white leading-none">Connect</h1>
-                        <p className="text-[7px] md:text-[8px] text-zinc-500 mt-0.5 md:mt-1 uppercase tracking-widest font-black opacity-60">Duo Space</p>
+                        <h1 className="text-[15px] md:text-base font-semibold text-white leading-tight">{partnerName}</h1>
+                        <p className="text-[11px] text-green-400 leading-tight">
+                            {partnerTyping ? 'typing...' : 'online'}
+                        </p>
                     </div>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleNudge}
-                    className="h-8 w-8 md:h-9 md:w-9 rounded-lg md:rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800/50"
-                >
-                    <BellRing className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleNudge}
+                        className="h-9 w-9 rounded-full text-zinc-400 hover:text-white hover:bg-white/10"
+                        title="Send Nudge"
+                    >
+                        <BellRing className="h-[18px] w-[18px]" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-full text-zinc-400 hover:text-white hover:bg-white/10"
+                    >
+                        <MoreVertical className="h-[18px] w-[18px]" />
+                    </Button>
+                </div>
             </header>
 
-            {/* 2. Fixed Sub Tabs (Shrink-0) */}
-            <div className="px-3 md:px-4 py-1.5 md:py-2 shrink-0 bg-zinc-950/20 z-10">
-                <div className="p-1 bg-zinc-900/30 rounded-xl md:rounded-2xl border border-zinc-800/30 backdrop-blur-sm">
-                    <div className="flex relative">
-                        <button
-                            onClick={() => setActiveTab('messages')}
-                            className={cn(
-                                "flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-2 text-[9px] md:text-[10px] font-black uppercase tracking-wider rounded-lg md:rounded-xl transition-all relative z-10",
-                                activeTab === 'messages' ? "text-pink-400" : "text-zinc-500 hover:text-zinc-300"
-                            )}
-                        >
-                            <MessageCircle className={cn("h-3 w-3 md:h-3.5 md:w-3.5", activeTab === 'messages' && "fill-pink-400/10")} />
-                            Messages
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('games')}
-                            className={cn(
-                                "flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-2 text-[9px] md:text-[10px] font-black uppercase tracking-wider rounded-lg md:rounded-xl transition-all relative z-10",
-                                activeTab === 'games' ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
-                            )}
-                        >
-                            <Gamepad2 className={cn("h-3 w-3 md:h-3.5 md:w-3.5", activeTab === 'games' && "fill-blue-400/10")} />
-                            Games
-                        </button>
-                        <div
-                            className={cn(
-                                "absolute top-0 bottom-0 w-1/2 bg-zinc-800/50 rounded-lg md:rounded-xl transition-all duration-300 ease-out shadow-lg border border-zinc-700/30",
-                                activeTab === 'games' ? "translate-x-full" : "translate-x-0"
-                            )}
-                        />
-                    </div>
+            {/* Sub Tabs */}
+            <div className="px-0 shrink-0 bg-[#1f2c34] z-10">
+                <div className="flex relative">
+                    <button
+                        onClick={() => setActiveTab('messages')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] md:text-xs font-bold uppercase tracking-wider transition-all relative",
+                            activeTab === 'messages' ? "text-green-400" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <MessageCircle className={cn("h-3.5 w-3.5", activeTab === 'messages' && "fill-green-400/10")} />
+                        Chats
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('games')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] md:text-xs font-bold uppercase tracking-wider transition-all relative",
+                            activeTab === 'games' ? "text-green-400" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <Gamepad2 className={cn("h-3.5 w-3.5", activeTab === 'games' && "fill-green-400/10")} />
+                        Games
+                    </button>
+                    {/* Active tab indicator */}
+                    <div
+                        className={cn(
+                            "absolute bottom-0 h-[3px] w-1/2 bg-green-400 rounded-t-full transition-all duration-300 ease-out",
+                            activeTab === 'games' ? "translate-x-full" : "translate-x-0"
+                        )}
+                    />
                 </div>
             </div>
 
-            {/* 3. Main Content Area */}
+            {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {activeTab === 'messages' ? (
                     <>
-                        {/* Scrollable Messages - Takes remaining space with flex-1 */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col-reverse custom-scrollbar">
-                            <div className="max-w-4xl mx-auto w-full space-y-4">
-                                <div ref={messagesEndRef} />
-                                {liveNotes.map((n: any) => (
-                                    <div
-                                        key={n.id}
-                                        className={cn(
-                                            "flex flex-col max-w-[85%] md:max-w-[70%] mb-4",
-                                            n.senderId === currentId ? "ml-auto items-end" : "items-start"
-                                        )}
-                                    >
-                                        <div className={cn(
-                                            "px-4 py-2.5 rounded-2xl text-sm shadow-sm transition-all",
-                                            n.senderId === currentId
-                                                ? "bg-pink-600 text-white rounded-br-none"
-                                                : "bg-zinc-800 text-zinc-100 rounded-bl-none border border-zinc-700/50"
-                                        )}>
-                                            <p className="whitespace-pre-wrap leading-relaxed">{n.content}</p>
+                        {/* Chat Background + Messages */}
+                        <div
+                            ref={messageContainerRef}
+                            className="flex-1 overflow-y-auto px-3 md:px-4 py-3 custom-scrollbar"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                                backgroundColor: '#0b141a'
+                            }}
+                        >
+                            <div className="max-w-3xl mx-auto w-full space-y-1">
+                                {/* Date-grouped messages */}
+                                {messageGroups.map((group, gi) => (
+                                    <div key={gi}>
+                                        {/* Date Separator */}
+                                        <div className="flex items-center justify-center my-3">
+                                            <div className="bg-[#182229] px-3 py-1 rounded-lg shadow-sm">
+                                                <span className="text-[11px] text-zinc-400 font-medium uppercase">
+                                                    {formatMessageDate(group.date)}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <span className="text-[10px] text-zinc-500 mt-1.5 px-1 font-medium">
-                                            {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
+
+                                        {/* Messages in this date group */}
+                                        {group.messages.map((n: any, mi: number) => {
+                                            const isMine = n.senderId === currentId
+                                            const isConsecutive = mi > 0 && group.messages[mi - 1].senderId === n.senderId
+
+                                            return (
+                                                <div
+                                                    key={n.id || mi}
+                                                    className={cn(
+                                                        "flex w-full",
+                                                        isMine ? "justify-end" : "justify-start",
+                                                        isConsecutive ? "mt-[2px]" : "mt-2"
+                                                    )}
+                                                >
+                                                    <div className={cn(
+                                                        "relative max-w-[80%] md:max-w-[65%] group",
+                                                    )}>
+                                                        {/* Sender Name (only for partner, first in group) */}
+                                                        {!isMine && !isConsecutive && (
+                                                            <p className="text-[11px] text-pink-400 font-medium mb-0.5 ml-1">
+                                                                {n.senderName || partnerName}
+                                                            </p>
+                                                        )}
+
+                                                        {/* Message Bubble */}
+                                                        <div className={cn(
+                                                            "relative px-3 py-1.5 md:px-3.5 md:py-2 shadow-sm",
+                                                            isMine
+                                                                ? "bg-[#005c4b] rounded-lg"
+                                                                : "bg-[#1f2c34] rounded-lg",
+                                                            !isConsecutive && isMine && "rounded-tr-none",
+                                                            !isConsecutive && !isMine && "rounded-tl-none"
+                                                        )}>
+                                                            {/* Bubble tail */}
+                                                            {!isConsecutive && (
+                                                                <div className={cn(
+                                                                    "absolute top-0 w-3 h-3 overflow-hidden",
+                                                                    isMine ? "-right-[6px]" : "-left-[6px]"
+                                                                )}>
+                                                                    <div className={cn(
+                                                                        "absolute w-3 h-3 transform rotate-45",
+                                                                        isMine
+                                                                            ? "bg-[#005c4b] -translate-x-1.5"
+                                                                            : "bg-[#1f2c34] translate-x-1.5"
+                                                                    )} />
+                                                                </div>
+                                                            )}
+
+                                                            {/* Content + Timestamp */}
+                                                            <div className="flex items-end gap-2">
+                                                                <p className="text-[14px] md:text-[15px] text-zinc-100 whitespace-pre-wrap leading-[1.35] flex-1 break-words">
+                                                                    {n.content}
+                                                                </p>
+                                                                <div className="flex items-center gap-0.5 shrink-0 -mb-0.5 ml-1">
+                                                                    <span className="text-[10px] text-zinc-400/70 leading-none">
+                                                                        {formatTime(n.createdAt)}
+                                                                    </span>
+                                                                    {/* Read receipts (only for sent messages) */}
+                                                                    {isMine && (
+                                                                        <CheckCheck className="h-3.5 w-3.5 text-blue-400 ml-0.5" />
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 ))}
+
+                                {/* Typing Indicator */}
+                                {partnerTyping && (
+                                    <div className="flex justify-start mt-2">
+                                        <div className="bg-[#1f2c34] rounded-lg rounded-tl-none px-4 py-3 shadow-sm relative">
+                                            <div className="absolute top-0 -left-[6px] w-3 h-3 overflow-hidden">
+                                                <div className="absolute w-3 h-3 transform rotate-45 bg-[#1f2c34] translate-x-1.5" />
+                                            </div>
+                                            <div className="flex gap-1 items-center">
+                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div ref={messagesEndRef} />
                             </div>
                         </div>
 
-                        {/* Fixed Bottom Input - Shrink-0 keeps it fixed at the bottom of the container */}
-                        <div className="px-4 pt-3 pb-8 md:pb-10 bg-zinc-950 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0 safe-pb">
-                            <form onSubmit={handleSendNote} className="flex gap-2.5 max-w-4xl mx-auto items-end">
-                                <div className="flex-1 relative group">
+                        {/* WhatsApp-Style Input Bar */}
+                        <div className="px-2 md:px-3 py-1.5 md:py-2 bg-[#1f2c34] border-t border-[#2a3942] shrink-0 safe-pb">
+                            <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto items-end">
+                                <div className="flex-1 flex items-end bg-[#2a3942] rounded-3xl px-3 md:px-4 py-1 min-h-[44px]">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-zinc-400 hover:text-white shrink-0 mb-0.5"
+                                    >
+                                        <Smile className="h-5 w-5" />
+                                    </Button>
                                     <textarea
-                                        className="w-full bg-zinc-900 border border-zinc-800 focus:border-pink-500/30 rounded-2xl py-3 px-4 pr-14 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none transition-all resize-none min-h-[48px] max-h-32 custom-scrollbar-thin"
-                                        placeholder="Type a message..."
+                                        ref={textareaRef}
+                                        className="flex-1 bg-transparent py-2.5 px-1 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-[1.3] max-h-[120px] custom-scrollbar-thin"
+                                        placeholder="Message"
                                         rows={1}
                                         value={note}
-                                        onChange={(e) => setNote(e.target.value)}
+                                        onChange={(e) => {
+                                            setNote(e.target.value)
+                                            autoResize()
+                                        }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault()
                                                 handleSendNote(e)
                                             }
                                         }}
-                                        maxLength={280}
+                                        style={{ height: '24px' }}
                                     />
-                                    <div className="absolute right-4 bottom-3 text-[9px] text-zinc-800 font-black group-focus-within:text-pink-500/40 transition-colors">
-                                        {note.length}/280
-                                    </div>
                                 </div>
-                                <Button
+                                <button
                                     type="submit"
                                     disabled={isSubmitting || !note.trim()}
-                                    className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl w-[48px] h-[48px] p-0 shrink-0 shadow-lg active:scale-95 transition-all flex items-center justify-center"
+                                    className={cn(
+                                        "h-[44px] w-[44px] rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90",
+                                        note.trim()
+                                            ? "bg-green-600 hover:bg-green-500 shadow-lg shadow-green-500/20"
+                                            : "bg-green-600/50 cursor-not-allowed"
+                                    )}
                                 >
-                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                                </Button>
+                                    {isSubmitting
+                                        ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                                        : <Send className="h-5 w-5 text-white ml-0.5" />
+                                    }
+                                </button>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto custom-scrollbar-thin">
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto custom-scrollbar-thin" style={{ backgroundColor: '#0b141a' }}>
                         <div className="w-full max-w-[320px] md:max-w-sm space-y-6 md:space-y-8 py-4">
                             <div className="flex items-center justify-between text-zinc-400">
                                 <div className="flex items-center gap-2">
@@ -334,7 +514,7 @@ export default function BondPage() {
                                 </div>
                                 <span className="text-[9px] font-black text-zinc-800">VS</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black uppercase tracking_widest opacity-60 text-right">Player O</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-60 text-right">Player O</span>
                                     <div className={cn("h-1.5 w-1.5 rounded-full", !xIsNext ? "bg-pink-500 animate-pulse" : "bg-zinc-800")} />
                                 </div>
                             </div>
@@ -344,10 +524,10 @@ export default function BondPage() {
                                     <button
                                         key={i}
                                         onClick={() => handlePlay(i)}
-                                        disabled={square || winner || !isMyTurn}
+                                        disabled={!!square || !!winner || !isMyTurn}
                                         className={cn(
-                                            "aspect-square bg-zinc-900/50 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black transition-all duration-300 border border-zinc-800/30",
-                                            !square && isMyTurn && !winner ? "hover:bg-zinc-800/80 cursor-pointer shadow-lg" : "cursor-default",
+                                            "aspect-square bg-[#1f2c34] rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black transition-all duration-300 border border-[#2a3942]",
+                                            !square && isMyTurn && !winner ? "hover:bg-[#2a3942] cursor-pointer shadow-lg" : "cursor-default",
                                             square === 'X' ? "text-blue-500" : "",
                                             square === 'O' ? "text-pink-500" : ""
                                         )}
@@ -380,7 +560,7 @@ export default function BondPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleResetGame}
-                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-zinc-900 text-[8px] font-black uppercase tracking-widest transition-all h-8"
+                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-[#2a3942] text-[8px] font-black uppercase tracking-widest transition-all h-8"
                                 >
                                     <RotateCcw className="h-2.5 w-2.5 md:h-3 md:w-3" />
                                     Reset Game
@@ -391,8 +571,5 @@ export default function BondPage() {
                 )}
             </div>
         </div>
-
-
-
     )
 }
