@@ -168,6 +168,49 @@ export default function PlaygroundPage() {
         }, 800)
     }
 
+    const highlightCode = (code: string) => {
+        // Simple but effective Python syntax highlighter
+        let highlighted = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // Keywords
+        const keywords = ['and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield', 'print'];
+        highlighted = highlighted.replace(new RegExp(`\\b(${keywords.join('|')})\\b`, 'g'), '<span class="text-[#569cd6]">$1</span>');
+
+        // Functions
+        highlighted = highlighted.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\()/g, '<span class="text-[#dcdcaa]">$1</span>');
+
+        // Strings
+        highlighted = highlighted.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="text-[#ce9178]">$1</span>');
+
+        // Comments
+        highlighted = highlighted.replace(/#.*$/gm, '<span class="text-[#6a9955]">$0</span>');
+
+        // Numbers
+        highlighted = highlighted.replace(/\b\d+\b/g, '<span class="text-[#b5cea8]">$0</span>');
+
+        return highlighted;
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = e.currentTarget.selectionStart;
+            const end = e.currentTarget.selectionEnd;
+            const newCode = code.substring(0, start) + '    ' + code.substring(end);
+            setCode(newCode);
+
+            // Set cursor position after update
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
+                }
+            }, 0);
+        }
+    };
+
     const runCode = async () => {
         if (!pyodide) return;
         setIsRunning(true)
@@ -266,21 +309,31 @@ export default function PlaygroundPage() {
                 {/* Editor Content with Line Numbers */}
                 <div className="flex-1 flex overflow-hidden relative group">
                     {/* Line Numbers */}
-                    <div className="w-10 bg-[#1e1e1e] flex flex-col items-center pt-5 text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d]">
+                    <div className="w-10 bg-[#1e1e1e] flex flex-col items-center pt-5 text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
                         {Array.from({ length: lineCount }).map((_, i) => (
                             <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                         ))}
                     </div>
 
-                    {/* Textarea */}
-                    <textarea
-                        ref={textareaRef}
-                        value={code}
-                        onChange={handleCodeChange}
-                        className="flex-1 bg-transparent p-5 font-mono text-[14px] resize-none focus:outline-none text-[#d4d4d4] leading-[21px] custom-scrollbar overflow-x-auto whitespace-pre z-10"
-                        placeholder="# Write your Python code here..."
-                        spellCheck={false}
-                    />
+                    {/* Editor Container */}
+                    <div className="flex-1 relative overflow-hidden font-mono text-[14px]">
+                        {/* Highlights Layer */}
+                        <pre
+                            className="absolute inset-0 p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden"
+                            dangerouslySetInnerHTML={{ __html: highlightCode(code) + '\n' }}
+                        />
+
+                        {/* Textarea Layer */}
+                        <textarea
+                            ref={textareaRef}
+                            value={code}
+                            onChange={handleCodeChange}
+                            onKeyDown={handleKeyDown}
+                            className="absolute inset-0 w-full h-full bg-transparent p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all"
+                            placeholder="# Write your Python code here..."
+                            spellCheck={false}
+                        />
+                    </div>
 
                     {/* Floating Run Button for Mobile/Desktop */}
                     <div className="absolute bottom-6 right-6 z-20">
@@ -359,3 +412,4 @@ export default function PlaygroundPage() {
         </div>
     )
 }
+

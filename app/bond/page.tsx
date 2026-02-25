@@ -28,7 +28,10 @@ export default function BondPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        // With flex-col-reverse, we just scroll to the container's bottom (which is visually the end)
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+        }
     }
 
     useEffect(() => {
@@ -50,6 +53,7 @@ export default function BondPage() {
         const noteChannel = pusherClient.subscribe('bond-update')
 
         noteChannel.bind('new-note', (newNote: any) => {
+            // Add to the list (note: ordering is handled by flex-col-reverse in UI)
             setLiveNotes(prev => [newNote, ...prev])
             if (newNote.senderId !== currentId) {
                 toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
@@ -238,14 +242,15 @@ export default function BondPage() {
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {activeTab === 'messages' ? (
                     <>
-                        {/* Scrollable Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar">
-                            <div className="max-w-4xl mx-auto space-y-4">
-                                {liveNotes.slice().reverse().map((n: any) => (
+                        {/* Scrollable Messages - Reversed flow */}
+                        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col-reverse custom-scrollbar">
+                            <div className="max-w-4xl mx-auto w-full space-y-4">
+                                <div ref={messagesEndRef} />
+                                {liveNotes.map((n: any) => (
                                     <div
                                         key={n.id}
                                         className={cn(
-                                            "flex flex-col max-w-[85%] md:max-w-[70%]",
+                                            "flex flex-col max-w-[85%] md:max-w-[70%] mb-4",
                                             n.senderId === currentId ? "ml-auto items-end" : "items-start"
                                         )}
                                     >
@@ -262,12 +267,11 @@ export default function BondPage() {
                                         </span>
                                     </div>
                                 ))}
-                                <div ref={messagesEndRef} />
                             </div>
                         </div>
 
-                        {/* Fixed Bottom Input - Positioned above navbar */}
-                        <div className="p-4 bg-zinc-950/95 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0">
+                        {/* Fixed Bottom Input - Positioned a bit higher for better ergonomics */}
+                        <div className="px-4 pt-4 pb-8 md:pb-10 bg-zinc-950/95 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0">
                             <form onSubmit={handleSendNote} className="flex gap-2.5 max-w-4xl mx-auto items-end">
                                 <div className="flex-1 relative group">
                                     <textarea
