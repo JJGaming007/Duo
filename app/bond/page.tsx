@@ -178,13 +178,12 @@ export default function BondPage() {
 
     return (
         /* 
-           h-[calc(100dvh-...] helps avoid overlap with mobile address bars 
-           - 3.5rem (56px) is the mobile header height
-           - 4.5rem (72px) is the approximate navigation bar height
+           h-[calc(100dvh-7.5rem)] ensures the container fits between the root layout header and bottom navigation.
+           Using overflow-hidden here and flex-1 overflow-y-auto on the message list creates the fixed header/footer effect.
         */
-        <div className="flex flex-col h-[calc(100dvh-8rem)] md:h-[750px] mx-auto max-w-5xl overflow-hidden relative">
-            {/* 1. Fixed Header */}
-            <header className="flex items-center justify-between shrink-0 px-4 py-2.5 md:py-3 bg-zinc-950/40 backdrop-blur-md border-b border-zinc-900/50">
+        <div className="flex flex-col h-[calc(100dvh-7.5rem)] md:h-[750px] mx-auto max-w-5xl overflow-hidden relative">
+            {/* 1. Fixed Header (Shrink-0 prevents it from scrolling) */}
+            <header className="flex items-center justify-between shrink-0 px-4 py-2.5 md:py-3 bg-zinc-950/40 backdrop-blur-md border-b border-zinc-900/50 z-20">
                 <div className="flex items-center gap-2.5 md:gap-3">
                     <div className="h-8 w-8 md:h-9 md:w-9 rounded-lg md:rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shadow-inner">
                         <Heart className="h-4 w-4 md:h-4.5 md:w-4.5 text-pink-500 fill-pink-500/20" />
@@ -204,8 +203,8 @@ export default function BondPage() {
                 </Button>
             </header>
 
-            {/* 2. Fixed Sub Tabs */}
-            <div className="px-3 md:px-4 py-1.5 md:py-2 shrink-0 bg-zinc-950/20">
+            {/* 2. Fixed Sub Tabs (Shrink-0) */}
+            <div className="px-3 md:px-4 py-1.5 md:py-2 shrink-0 bg-zinc-950/20 z-10">
                 <div className="p-1 bg-zinc-900/30 rounded-xl md:rounded-2xl border border-zinc-800/30 backdrop-blur-sm">
                     <div className="flex relative">
                         <button
@@ -242,7 +241,7 @@ export default function BondPage() {
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {activeTab === 'messages' ? (
                     <>
-                        {/* Scrollable Messages - Reversed flow */}
+                        {/* Scrollable Messages - Takes remaining space with flex-1 */}
                         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col-reverse custom-scrollbar">
                             <div className="max-w-4xl mx-auto w-full space-y-4">
                                 <div ref={messagesEndRef} />
@@ -270,8 +269,8 @@ export default function BondPage() {
                             </div>
                         </div>
 
-                        {/* Fixed Bottom Input - Positioned a bit higher for better ergonomics */}
-                        <div className="px-4 pt-3 pb-8 md:pb-10 bg-zinc-950/95 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0 safe-pb">
+                        {/* Fixed Bottom Input - Shrink-0 keeps it fixed at the bottom of the container */}
+                        <div className="px-4 pt-3 pb-8 md:pb-10 bg-zinc-950 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0 safe-pb">
                             <form onSubmit={handleSendNote} className="flex gap-2.5 max-w-4xl mx-auto items-end">
                                 <div className="flex-1 relative group">
                                     <textarea

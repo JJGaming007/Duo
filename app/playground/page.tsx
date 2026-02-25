@@ -33,6 +33,19 @@ export default function PlaygroundPage() {
     const ignoreNextSyncRef = useRef(false)
 
     const [lineCount, setLineCount] = useState(1)
+    const [suggestions, setSuggestions] = useState<string[]>([])
+    const [selectedIndex, setSelectedIndex] = useState(0)
+    const [suggestionPos, setSuggestionPos] = useState({ top: 0, left: 0 })
+    const [showSuggestions, setShowSuggestions] = useState(false)
+
+    const highlightsRef = useRef<HTMLPreElement>(null)
+    const PYTHON_KEYWORDS = [
+        'print', 'len', 'range', 'input', 'str', 'int', 'float', 'list', 'dict', 'set', 'tuple',
+        'if', 'else', 'elif', 'for', 'while', 'break', 'continue', 'return', 'def', 'class',
+        'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'lambda', 'True', 'False', 'None',
+        'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'index', 'count', 'sort', 'reverse',
+        'keys', 'values', 'items', 'get', 'update', 'split', 'join', 'strip', 'lower', 'upper', 'replace'
+    ]
 
     // Sync line numbers and save to localStorage
     useEffect(() => {
@@ -152,6 +165,34 @@ export default function PlaygroundPage() {
         const newCode = e.target.value
         setCode(newCode)
 
+        // Basic Intellisense trigger
+        const cursor = e.target.selectionStart
+        const textBeforeCursor = newCode.substring(0, cursor)
+        const currentWordMatch = textBeforeCursor.match(/(\b[a-zA-Z_][a-zA-Z0-9_]*)$/)
+
+        if (currentWordMatch) {
+            const currentWord = currentWordMatch[1]
+            const filtered = PYTHON_KEYWORDS.filter(k => k.startsWith(currentWord) && k !== currentWord)
+            if (filtered.length > 0) {
+                setSuggestions(filtered)
+                setSelectedIndex(0)
+                setShowSuggestions(true)
+
+                // Approximate position math (simplified)
+                const lines = textBeforeCursor.split('\n')
+                const currentLine = lines.length
+                const charInLine = lines[lines.length - 1].length
+                setSuggestionPos({
+                    top: (currentLine * 21) + 20, // 21 is line height, 20 is padding
+                    left: (charInLine * 8.4) + 40 // 8.4 is approx char width, 40 is line number bar
+                })
+            } else {
+                setShowSuggestions(false)
+            }
+        } else {
+            setShowSuggestions(false)
+        }
+
         if (ignoreNextSyncRef.current) {
             ignoreNextSyncRef.current = false
             return
@@ -166,6 +207,37 @@ export default function PlaygroundPage() {
         typingTimeoutRef.current = setTimeout(() => {
             syncCode(newCode)
         }, 800)
+    }
+
+    const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+        if (highlightsRef.current) {
+            highlightsRef.current.scrollTop = e.currentTarget.scrollTop
+            highlightsRef.current.scrollLeft = e.currentTarget.scrollLeft
+        }
+    }
+
+    const selectSuggestion = (suggestion: string) => {
+        if (!textareaRef.current) return
+        const cursor = textareaRef.current.selectionStart
+        const textBeforeCursor = code.substring(0, cursor)
+        const textAfterCursor = code.substring(cursor)
+        const lastWordMatch = textBeforeCursor.match(/(\b[a-zA-Z_][a-zA-Z0-9_]*)$/)
+
+        if (lastWordMatch) {
+            const lastWord = lastWordMatch[1]
+            const newBefore = textBeforeCursor.substring(0, textBeforeCursor.length - lastWord.length) + suggestion
+            const newCode = newBefore + textAfterCursor
+            setCode(newCode)
+            setShowSuggestions(false)
+
+            // Set cursor position after completion
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.selectionStart = textareaRef.current.selectionEnd = newBefore.length
+                    textareaRef.current.focus()
+                }
+            }, 0)
+        }
     }
 
     const highlightCode = (code: string) => {
@@ -195,6 +267,28 @@ export default function PlaygroundPage() {
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (showSuggestions) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setSelectedIndex(prev => (prev + 1) % suggestions.length)
+                return
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setSelectedIndex(prev => (prev - 1 + suggestions.length) % suggestions.length)
+                return
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                selectSuggestion(suggestions[selectedIndex])
+                return
+            }
+            if (e.key === 'Escape') {
+                setShowSuggestions(false)
+                return
+            }
+        }
+
         if (e.key === 'Tab') {
             e.preventDefault();
             const start = e.currentTarget.selectionStart;
@@ -318,10 +412,17 @@ export default function PlaygroundPage() {
 
                     {/* Editor Container */}
                     <div className="flex-1 relative overflow-hidden font-mono text-[13px] md:text-[14px]">
-                        {/* Highlights Layer */}
+                        {/* Highlights Layer - Must exactly match textarea font/padding */}
                         <pre
-                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden"
+                            ref={highlightsRef}
+                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden font-mono"
                             dangerouslySetInnerHTML={{ __html: highlightCode(code) + '\n' }}
+                            style={{
+                                fontVariantLigatures: 'none',
+                                MozTabSize: 4,
+                                OTabSize: 4,
+                                tabSize: 4,
+                            }}
                         />
 
                         {/* Textarea Layer */}
@@ -330,10 +431,44 @@ export default function PlaygroundPage() {
                             value={code}
                             onChange={handleCodeChange}
                             onKeyDown={handleKeyDown}
-                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all"
+                            onScroll={handleScroll}
+                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all font-mono"
                             placeholder="# Write your Python code here..."
                             spellCheck={false}
+                            style={{
+                                fontVariantLigatures: 'none',
+                                MozTabSize: 4,
+                                OTabSize: 4,
+                                tabSize: 4,
+                            }}
                         />
+
+                        {/* Intellisense Widget */}
+                        {showSuggestions && (
+                            <div
+                                className="absolute z-50 bg-[#252526] border border-[#454545] rounded shadow-2xl min-w-[160px] max-h-[200px] overflow-y-auto pointer-events-auto"
+                                style={{
+                                    top: Math.min(suggestionPos.top, (textareaRef.current?.clientHeight || 0) - 100),
+                                    left: Math.min(suggestionPos.left, (textareaRef.current?.clientWidth || 0) - 170)
+                                }}
+                            >
+                                {suggestions.map((s, i) => (
+                                    <div
+                                        key={s}
+                                        onClick={() => selectSuggestion(s)}
+                                        className={cn(
+                                            "px-4 py-1.5 text-[11px] md:text-[12px] cursor-pointer flex items-center gap-2 transition-colors",
+                                            i === selectedIndex ? "bg-[#094771] text-white" : "text-zinc-400 hover:bg-[#2a2d2e]"
+                                        )}
+                                    >
+                                        <div className="w-3 h-3 bg-blue-500/20 rounded flex items-center justify-center">
+                                            <span className="text-[8px] text-blue-400 font-bold">P</span>
+                                        </div>
+                                        {s}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Floating Run Button for Mobile/Desktop */}
