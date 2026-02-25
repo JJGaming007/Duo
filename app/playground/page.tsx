@@ -197,7 +197,7 @@ export default function PlaygroundPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[750px] space-y-4 max-w-7xl mx-auto px-1 md:px-0">
+        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] p-4 md:p-6 space-y-4 max-w-7xl mx-auto overflow-hidden">
             <Script
                 src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
                 onLoad={initPyodide}

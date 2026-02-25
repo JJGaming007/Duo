@@ -56,7 +56,7 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <header className="flex flex-col gap-2">
                 <h1 className="text-3xl font-bold tracking-tight text-white">Dashboard</h1>
                 <div className="flex items-center gap-2">

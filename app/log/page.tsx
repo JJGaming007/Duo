@@ -61,7 +61,7 @@ export default function LogPage() {
     if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
 
     return (
-        <div className="space-y-6">
+        <div className="p-4 md:p-8 space-y-6">
             <button
                 onClick={() => router.back()}
                 className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors"

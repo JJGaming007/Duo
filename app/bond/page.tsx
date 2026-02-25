@@ -173,31 +173,36 @@ export default function BondPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[750px] max-w-5xl mx-auto overflow-hidden">
+        /* 
+           h-[calc(100dvh-...] helps avoid overlap with mobile address bars 
+           - 3.5rem (56px) is the mobile header height
+           - 4.5rem (72px) is the approximate navigation bar height
+        */
+        <div className="flex flex-col h-[calc(100dvh-9rem)] md:h-[750px] mx-auto max-w-5xl overflow-hidden relative">
             {/* 1. Fixed Header */}
-            <header className="flex items-center justify-between shrink-0 px-4 py-3 bg-zinc-950/20">
+            <header className="flex items-center justify-between shrink-0 px-4 py-3 bg-zinc-950/40 backdrop-blur-md border-b border-zinc-900/50">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shadow-inner">
-                        <Heart className="h-5 w-5 text-pink-500 fill-pink-500/20" />
+                    <div className="h-9 w-9 rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shadow-inner">
+                        <Heart className="h-4.5 w-4.5 text-pink-500 fill-pink-500/20" />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">Connect</h1>
-                        <p className="text-[9px] text-zinc-500 mt-1 uppercase tracking-widest font-bold opacity-70">Bonding Space</p>
+                        <h1 className="text-lg md:text-xl font-bold tracking-tight text-white leading-none">Connect</h1>
+                        <p className="text-[8px] text-zinc-500 mt-1 uppercase tracking-widest font-black opacity-60">Duo Space</p>
                     </div>
                 </div>
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleNudge}
-                    className="h-10 w-10 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800"
+                    className="h-9 w-9 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800/50"
                 >
                     <BellRing className="h-4 w-4" />
                 </Button>
             </header>
 
             {/* 2. Fixed Sub Tabs */}
-            <div className="px-4 pb-2 shrink-0">
-                <div className="p-1 bg-zinc-900/50 rounded-2xl border border-zinc-800/50">
+            <div className="px-4 py-2 shrink-0 bg-zinc-950/20">
+                <div className="p-1 bg-zinc-900/30 rounded-2xl border border-zinc-800/30 backdrop-blur-sm">
                     <div className="flex relative">
                         <button
                             onClick={() => setActiveTab('messages')}
@@ -221,7 +226,7 @@ export default function BondPage() {
                         </button>
                         <div
                             className={cn(
-                                "absolute top-0 bottom-0 w-1/2 bg-zinc-800 rounded-xl transition-all duration-300 ease-out shadow-lg border border-zinc-700/30",
+                                "absolute top-0 bottom-0 w-1/2 bg-zinc-800/50 rounded-xl transition-all duration-300 ease-out shadow-lg border border-zinc-700/30",
                                 activeTab === 'games' ? "translate-x-full" : "translate-x-0"
                             )}
                         />
@@ -230,11 +235,11 @@ export default function BondPage() {
             </div>
 
             {/* 3. Main Content Area */}
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 relative">
                 {activeTab === 'messages' ? (
                     <>
                         {/* Scrollable Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar">
                             <div className="max-w-4xl mx-auto space-y-4">
                                 {liveNotes.slice().reverse().map((n: any) => (
                                     <div
@@ -261,12 +266,12 @@ export default function BondPage() {
                             </div>
                         </div>
 
-                        {/* Fixed Bottom Input */}
-                        <div className="p-4 md:p-6 bg-zinc-950/90 border-t border-zinc-900/50 backdrop-blur-xl shrink-0 pb-6">
-                            <form onSubmit={handleSendNote} className="flex gap-3 max-w-4xl mx-auto items-end">
+                        {/* Fixed Bottom Input - Positioned above navbar */}
+                        <div className="p-4 bg-zinc-950/95 border-t border-zinc-900/50 backdrop-blur-2xl shrink-0">
+                            <form onSubmit={handleSendNote} className="flex gap-2.5 max-w-4xl mx-auto items-end">
                                 <div className="flex-1 relative group">
                                     <textarea
-                                        className="w-full bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 focus:border-pink-500/50 rounded-2xl py-3.5 px-5 pr-14 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-4 focus:ring-pink-500/5 transition-all resize-none min-h-[52px] max-h-32 custom-scrollbar-thin shadow-inner"
+                                        className="w-full bg-zinc-900 border border-zinc-800 focus:border-pink-500/30 rounded-2xl py-3 px-4 pr-14 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none transition-all resize-none min-h-[48px] max-h-32 custom-scrollbar-thin"
                                         placeholder="Type a message..."
                                         rows={1}
                                         value={note}
@@ -279,44 +284,44 @@ export default function BondPage() {
                                         }}
                                         maxLength={280}
                                     />
-                                    <div className="absolute right-4 bottom-3.5 text-[9px] text-zinc-700 font-bold group-focus-within:text-pink-500/40 transition-colors">
+                                    <div className="absolute right-4 bottom-3 text-[9px] text-zinc-800 font-black group-focus-within:text-pink-500/40 transition-colors">
                                         {note.length}/280
                                     </div>
                                 </div>
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting || !note.trim()}
-                                    className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl w-[52px] h-[52px] p-0 shrink-0 shadow-xl shadow-pink-900/20 active:scale-90 transition-all group"
+                                    className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl w-[48px] h-[48px] p-0 shrink-0 shadow-lg active:scale-95 transition-all flex items-center justify-center"
                                 >
-                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}
+                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                                 </Button>
                             </form>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.05)_0,rgba(0,0,0,0)_100%)]">
+                    <div className="flex-1 flex flex-col items-center justify-center p-6">
                         <div className="w-full max-w-sm space-y-8">
                             <div className="flex items-center justify-between text-zinc-400">
                                 <div className="flex items-center gap-2">
-                                    <div className={cn("h-2 w-2 rounded-full", xIsNext ? "bg-blue-500 animate-pulse" : "bg-zinc-800")} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Player X</span>
+                                    <div className={cn("h-1.5 w-1.5 rounded-full", xIsNext ? "bg-blue-500 animate-pulse" : "bg-zinc-800")} />
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Player X</span>
                                 </div>
-                                <span className="text-[10px] font-black text-zinc-800">VS</span>
+                                <span className="text-[9px] font-black text-zinc-800">VS</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black uppercase tracking_widest text-right">Player O</span>
-                                    <div className={cn("h-2 w-2 rounded-full", !xIsNext ? "bg-pink-500 animate-pulse" : "bg-zinc-800")} />
+                                    <span className="text-[9px] font-black uppercase tracking_widest opacity-60 text-right">Player O</span>
+                                    <div className={cn("h-1.5 w-1.5 rounded-full", !xIsNext ? "bg-pink-500 animate-pulse" : "bg-zinc-800")} />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 aspect-square">
+                            <div className="grid grid-cols-3 gap-2 aspect-square">
                                 {board.map((square, i) => (
                                     <button
                                         key={i}
                                         onClick={() => handlePlay(i)}
                                         disabled={square || winner || !isMyTurn}
                                         className={cn(
-                                            "aspect-square bg-zinc-900 rounded-2xl flex items-center justify-center text-4xl md:text-5xl font-black transition-all duration-300 border border-zinc-800/50 shadow-lg",
-                                            !square && isMyTurn && !winner ? "hover:bg-zinc-800/80 cursor-pointer" : "cursor-default",
+                                            "aspect-square bg-zinc-900/50 rounded-2xl flex items-center justify-center text-3xl md:text-4xl font-black transition-all duration-300 border border-zinc-800/30",
+                                            !square && isMyTurn && !winner ? "hover:bg-zinc-800/80 cursor-pointer shadow-lg" : "cursor-default",
                                             square === 'X' ? "text-blue-500" : "",
                                             square === 'O' ? "text-pink-500" : ""
                                         )}
@@ -329,16 +334,16 @@ export default function BondPage() {
                             <div className="flex flex-col items-center gap-4">
                                 <div className="h-10 flex items-center justify-center">
                                     {winner ? (
-                                        <div className="px-6 py-2 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 font-black uppercase tracking-widest text-xs animate-bounce">
+                                        <div className="px-5 py-2 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 font-black uppercase tracking-widest text-[10px] animate-bounce">
                                             Winner: {winner} 🏆
                                         </div>
                                     ) : isDraw ? (
-                                        <div className="px-6 py-2 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-black uppercase tracking-widest text-xs">
+                                        <div className="px-5 py-2 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-black uppercase tracking-widest text-[10px]">
                                             Draw! 🤝
                                         </div>
                                     ) : (
                                         <div className={cn(
-                                            "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em]",
+                                            "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em]",
                                             isMyTurn ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-zinc-900 text-zinc-600 border border-zinc-800"
                                         )}>
                                             {isMyTurn ? "Your Turn" : "Waiting..."}
@@ -349,9 +354,9 @@ export default function BondPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleResetGame}
-                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-zinc-900 text-[9px] font-black uppercase tracking-widest transition-all"
+                                    className="gap-2 text-zinc-500 hover:text-white hover:bg-zinc-900 text-[8px] font-black uppercase tracking-widest transition-all"
                                 >
-                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    <RotateCcw className="h-3 w-3" />
                                     Reset Game
                                 </Button>
                             </div>
@@ -360,6 +365,7 @@ export default function BondPage() {
                 )}
             </div>
         </div>
+
 
     )
 }

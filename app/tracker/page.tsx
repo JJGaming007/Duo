@@ -34,7 +34,7 @@ export default function TrackerPage() {
     if (idLoading || loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
             <header className="flex flex-col gap-2">
                 <h1 className="text-3xl font-bold tracking-tight text-white">Course Tracker</h1>
                 <div className="flex items-center gap-4">
