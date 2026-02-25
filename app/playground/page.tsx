@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu } from 'lucide-react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -23,12 +23,20 @@ export default function PlaygroundPage() {
     const [isRunning, setIsRunning] = useState(false)
     const [isTyping, setIsTyping] = useState(false)
     const [lastEditedBy, setLastEditedBy] = useState<string | null>(null)
-    const [partnerPresence, setPartnerPresence] = useState(false)
+    const [presenceCount, setPresenceCount] = useState(0)
     const [pyodide, setPyodide] = useState<any>(null)
     const [engineStatus, setEngineStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+    const [showConsole, setShowConsole] = useState(false)
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const ignoreNextSyncRef = useRef(false)
+
+    // Sync line numbers
+    const [lineCount, setLineCount] = useState(1)
+    useEffect(() => {
+        setLineCount(code.split('\n').length)
+    }, [code])
 
     // Load Pyodide
     const initPyodide = async () => {
@@ -48,6 +56,22 @@ export default function PlaygroundPage() {
     useEffect(() => {
         if (!currentId) return
 
+        // Presence Channel for reliable status
+        const presenceChannel = pusherClient.subscribe('presence-playground')
+
+        presenceChannel.bind('pusher:subscription_succeeded', (members: any) => {
+            setPresenceCount(members.count)
+        })
+
+        presenceChannel.bind('pusher:member_added', () => {
+            setPresenceCount(prev => prev + 1)
+        })
+
+        presenceChannel.bind('pusher:member_removed', () => {
+            setPresenceCount(prev => Math.max(0, prev - 1))
+        })
+
+        // Collaboration Channel
         const channel = pusherClient.subscribe('playground')
 
         channel.bind('code-update', (data: any) => {
@@ -59,26 +83,18 @@ export default function PlaygroundPage() {
                 } else if (data.type === 'typing') {
                     setIsTyping(true)
                     setTimeout(() => setIsTyping(false), 2000)
-                } else if (data.type === 'presence') {
-                    setPartnerPresence(true)
                 }
             }
         })
 
-        // Broadcast presence
-        fetch('/api/playground/sync', {
-            method: 'POST',
-            body: JSON.stringify({ type: 'presence', senderId: currentId })
-        })
-
         return () => {
+            pusherClient.unsubscribe('presence-playground')
             pusherClient.unsubscribe('playground')
         }
     }, [currentId])
 
     const syncCode = async (newCode: string) => {
         if (!currentId) return
-
         try {
             await fetch('/api/playground/sync', {
                 method: 'POST',
@@ -103,26 +119,24 @@ export default function PlaygroundPage() {
             return
         }
 
-        // Broadcast typing
         fetch('/api/playground/sync', {
             method: 'POST',
             body: JSON.stringify({ type: 'typing', senderId: currentId })
         })
 
-        // Debounced sync
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
         typingTimeoutRef.current = setTimeout(() => {
             syncCode(newCode)
-        }, 500)
+        }, 800)
     }
 
     const runCode = async () => {
         if (!pyodide) return;
         setIsRunning(true)
         setOutput('')
+        setShowConsole(true)
 
         try {
-            // Setup stdout capturing
             await pyodide.runPython(`
                 import sys
                 import io
@@ -135,7 +149,8 @@ export default function PlaygroundPage() {
             const stdout = await pyodide.runPython("sys.stdout.getvalue()");
             const stderr = await pyodide.runPython("sys.stderr.getvalue()");
 
-            setOutput(stdout + (stderr ? `\nError:\n${stderr}` : ''));
+            const result = stdout + (stderr ? `\nError:\n${stderr}` : '');
+            setOutput(result || 'Code executed with no output.');
         } catch (error: any) {
             setOutput(`Error: ${error.message}`);
         } finally {
@@ -144,115 +159,164 @@ export default function PlaygroundPage() {
     }
 
     return (
-        <div className="space-y-6 pb-20">
+        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] space-y-4 max-w-7xl mx-auto">
             <Script
                 src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
                 onLoad={initPyodide}
             />
 
-            <header className="flex flex-col gap-2">
+            {/* Header Area */}
+            <header className="flex flex-col gap-2 shrink-0 px-1">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
-                            <Terminal className="h-5 w-5 text-green-500" />
+                        <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                            <Terminal className="h-5 w-5 text-blue-400" />
                         </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white">Python Playground</h1>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">Pyground</h1>
+                            <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest font-bold">VS Code Edition</p>
+                        </div>
                     </div>
+
                     <div className="flex items-center gap-3">
                         {isTyping && (
-                            <span className="text-xs text-green-500 animate-pulse bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20">
-                                Partner is typing...
+                            <span className="text-[10px] text-blue-400 animate-pulse font-bold bg-blue-500/5 px-2 py-0.5 rounded-full border border-blue-500/10 hidden sm:inline">
+                                Partner typing...
                             </span>
                         )}
                         <div className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all duration-500",
-                            partnerPresence ? "bg-blue-500/10 border-blue-500/50 text-blue-400" : "bg-zinc-900 border-zinc-800 text-zinc-500"
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all duration-500 shadow-lg",
+                            presenceCount > 1 ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-900 border-zinc-800 text-zinc-500"
                         )}>
-                            <div className={cn("h-1.5 w-1.5 rounded-full", partnerPresence ? "bg-blue-400 animate-pulse" : "bg-zinc-700")}></div>
-                            {partnerPresence ? "Partner Online" : "Partner Offline"}
+                            <div className={cn("h-1.5 w-1.5 rounded-full", presenceCount > 1 ? "bg-green-400 animate-pulse" : "bg-zinc-700")}></div>
+                            {presenceCount > 1 ? "Partner Online" : "Partner Offline"}
                         </div>
-                    </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
-                    <div className="flex items-center gap-1.5">
-                        <Cpu className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-yellow-500")} />
-                        <span>Engine: {engineStatus === 'loading' ? 'Locating WASM Interpreter...' : engineStatus === 'ready' ? 'Pyodide 3.11 Ready' : 'Execution Error'}</span>
-                    </div>
-                    {lastEditedBy && (
-                        <div className="flex items-center gap-1.5">
-                            <User className="h-3 w-3" />
-                            <span>Last edited by <span className="text-zinc-300 font-medium">{lastEditedBy}</span></span>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                        <Clock className="h-3 w-3" />
-                        <span>Real-time Sync Enabled</span>
                     </div>
                 </div>
             </header>
 
-            <div className="grid gap-6 lg:grid-cols-2 lg:h-[600px]">
-                {/* Editor Section */}
-                <Card className="border-zinc-800 bg-zinc-900/40 flex flex-col overflow-hidden">
-                    <CardHeader className="py-3 px-4 border-b border-zinc-800 flex flex-row items-center justify-between bg-zinc-900/60">
-                        <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-red-500"></div>
-                            <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
-                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                            <span className="ml-2 text-[10px] font-mono text-zinc-500">main.py</span>
+            {/* Main Interactive Editor */}
+            <Card className="flex-1 flex flex-col bg-[#1e1e1e] border-zinc-800 overflow-hidden shadow-2xl relative">
+
+                {/* Editor Toolbar */}
+                <div className="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#1a1a1a] shrink-0">
+                    <div className="flex items-center gap-4 text-[11px] font-medium text-zinc-400">
+                        <div className="flex items-center gap-1.5 text-blue-400 border-b-2 border-blue-500 h-10 px-2 mt-[2px]">
+                            <Terminal className="h-3 w-3" />
+                            main.py
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-white" onClick={() => setCode('print("Hello Achu! 🚀")')}>
+                        {lastEditedBy && (
+                            <div className="hidden sm:flex items-center gap-1.5 border-l border-zinc-800 pl-4">
+                                <User className="h-3 w-3" />
+                                <span>Recent edits by <span className="text-zinc-200">{lastEditedBy}</span></span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/50 rounded text-[10px] text-zinc-500 mr-2">
+                            <Cpu className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-zinc-600")} />
+                            <span>{engineStatus === 'ready' ? 'Python 3.11' : 'Initializing...'}</span>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => {
+                            if (confirm('Reset current code?')) setCode('print("Hello Achu! 🚀")')
+                        }}>
                             <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
-                    </CardHeader>
-                    <CardContent className="p-0 flex-1 relative">
-                        <textarea
-                            value={code}
-                            onChange={handleCodeChange}
-                            className="w-full h-full bg-transparent p-6 font-mono text-sm resize-none focus:outline-none text-zinc-300 leading-relaxed custom-scrollbar"
-                            placeholder="# Write your Python code here..."
-                            spellCheck={false}
-                        />
-                    </CardContent>
-                    <div className="p-4 border-t border-zinc-800 bg-zinc-900/60 flex justify-end">
+                    </div>
+                </div>
+
+                {/* Editor Content with Line Numbers */}
+                <div className="flex-1 flex overflow-hidden relative group">
+                    {/* Line Numbers */}
+                    <div className="w-10 bg-[#1e1e1e] flex flex-col items-center pt-5 text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d]">
+                        {Array.from({ length: lineCount }).map((_, i) => (
+                            <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
+                        ))}
+                    </div>
+
+                    {/* Textarea */}
+                    <textarea
+                        ref={textareaRef}
+                        value={code}
+                        onChange={handleCodeChange}
+                        className="flex-1 bg-transparent p-5 font-mono text-[14px] resize-none focus:outline-none text-[#d4d4d4] leading-[21px] custom-scrollbar overflow-x-auto whitespace-pre z-10"
+                        placeholder="# Write your Python code here..."
+                        spellCheck={false}
+                    />
+
+                    {/* Floating Run Button for Mobile/Desktop */}
+                    <div className="absolute bottom-6 right-6 z-20">
                         <Button
                             onClick={runCode}
                             disabled={isRunning || engineStatus !== 'ready'}
-                            className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 px-6 shadow-lg shadow-green-900/20"
+                            className="h-12 w-12 md:h-auto md:w-auto md:px-6 rounded-full md:rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all"
                         >
-                            {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
-                            {engineStatus === 'loading' ? 'Loading Engine...' : 'Run Code'}
+                            {isRunning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
+                            <span className="hidden md:inline">Run Code</span>
                         </Button>
                     </div>
-                </Card>
+                </div>
 
-                {/* Output Section */}
-                <Card className="border-zinc-800 bg-zinc-950 flex flex-col overflow-hidden shadow-2xl">
-                    <CardHeader className="py-3 px-4 border-b border-zinc-800 bg-zinc-900/40">
-                        <CardTitle className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                {/* Dynamic Sliding Console */}
+                <div className={cn(
+                    "absolute bottom-0 left-0 right-0 bg-[#181818] border-t border-[#333333] transition-all duration-300 ease-in-out z-30 flex flex-col",
+                    showConsole ? "h-1/3 md:h-[250px]" : "h-0"
+                )}>
+                    <div className="h-8 shrink-0 flex items-center justify-between px-4 bg-[#252526] border-b border-[#1a1a1a]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
                             <Share2 className="h-3 w-3" />
-                            Console Output
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 flex-1 font-mono text-sm overflow-y-auto custom-scrollbar">
-                        {isRunning ? (
-                            <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>Executing via WASM...</span>
-                            </div>
-                        ) : output ? (
+                            Output Console
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-zinc-500 hover:text-white"
+                                onClick={() => setShowConsole(!showConsole)}
+                            >
+                                {showConsole ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex-1 p-4 font-mono text-sm overflow-y-auto custom-scrollbar-thin bg-[#0f0f0f]">
+                        {output ? (
                             <pre className={cn(
                                 "whitespace-pre-wrap break-all",
-                                output.startsWith('Error') ? "text-red-400" : "text-green-400"
+                                output.startsWith('Error') ? "text-red-400" : "text-[#4ec9b0]"
                             )}>
                                 {output}
                             </pre>
                         ) : (
-                            <span className="text-zinc-600 italic">No output yet. Click "Run Code" to see results.</span>
+                            <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-2 opacity-50">
+                                <CheckCircle2 className="h-8 w-8" />
+                                <span className="text-xs">No output to display</span>
+                            </div>
                         )}
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                </div>
+            </Card>
+
+            {/* Footer Status Bar */}
+            <footer className="h-6 bg-blue-600 px-3 flex items-center justify-between text-[10px] text-white font-medium shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1 hover:bg-white/10 px-1 cursor-default">
+                        <Share2 className="h-3 w-3" />
+                        主 main*
+                    </div>
+                    <div className="flex items-center gap-1 hover:bg-white/10 px-1">
+                        <RotateCcw className="h-3 w-3" />
+                        0 Errors
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <span>UTF-8</span>
+                    <span>Python 3.11 (WASM)</span>
+                    <div className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Prettier
+                    </div>
+                </div>
+            </footer>
         </div>
     )
 }
