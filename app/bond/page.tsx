@@ -173,44 +173,60 @@ export default function BondPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] space-y-4 max-w-5xl mx-auto">
-            <header className="flex items-center justify-between shrink-0 px-1">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20">
-                        <Heart className="h-5 w-5 text-pink-500 fill-pink-500" />
+        <div className="flex flex-col h-[calc(100vh-7.5rem)] md:h-[750px] space-y-4 max-w-5xl mx-auto px-1 md:px-0">
+            {/* Page Header */}
+            <header className="flex items-center justify-between shrink-0 px-2 py-1">
+                <div className="flex items-center gap-3.5">
+                    <div className="h-11 w-11 rounded-2xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shadow-inner">
+                        <Heart className="h-6 w-6 text-pink-500 fill-pink-500/20" />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">Connect</h1>
-                        <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest font-bold">Bonding Space</p>
+                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-none">Connect</h1>
+                        <p className="text-[10px] text-zinc-500 mt-1.5 uppercase tracking-[0.2em] font-black opacity-80">Private Space • Duo Edition</p>
                     </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={handleNudge} className="h-10 w-10 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800">
-                    <BellRing className="h-4 w-4" />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNudge}
+                    className="h-11 w-11 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800 transition-all active:scale-95"
+                >
+                    <BellRing className="h-5 w-5" />
                 </Button>
             </header>
 
-            {/* Sub Tabs */}
-            <div className="flex p-1 bg-zinc-900/50 rounded-xl border border-zinc-800/50 shrink-0">
-                <button
-                    onClick={() => setActiveTab('messages')}
-                    className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                        activeTab === 'messages' ? "bg-zinc-800 text-pink-400 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
-                    )}
-                >
-                    <MessageCircle className="h-4 w-4" />
-                    Messages
-                </button>
-                <button
-                    onClick={() => setActiveTab('games')}
-                    className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                        activeTab === 'games' ? "bg-zinc-800 text-blue-400 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
-                    )}
-                >
-                    <Gamepad2 className="h-4 w-4" />
-                    Games
-                </button>
+            {/* Sub Tabs - Segmented Control style */}
+            <div className="p-1 bg-zinc-900/80 rounded-2xl border border-zinc-800/50 shrink-0 mx-2 shadow-2xl">
+                <div className="flex relative">
+                    <button
+                        onClick={() => setActiveTab('messages')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2.5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all relative z-10",
+                            activeTab === 'messages' ? "text-pink-400" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <MessageCircle className={cn("h-4 w-4", activeTab === 'messages' && "fill-pink-400/10")} />
+                        Messages
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('games')}
+                        className={cn(
+                            "flex-1 flex items-center justify-center gap-2.5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all relative z-10",
+                            activeTab === 'games' ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                    >
+                        <Gamepad2 className={cn("h-4 w-4", activeTab === 'games' && "fill-blue-400/10")} />
+                        Games
+                    </button>
+
+                    {/* Animated Tab Background */}
+                    <div
+                        className={cn(
+                            "absolute top-0 bottom-0 w-1/2 bg-zinc-800 rounded-xl transition-all duration-300 ease-out shadow-lg border border-zinc-700/30",
+                            activeTab === 'games' ? "translate-x-full" : "translate-x-0"
+                        )}
+                    />
+                </div>
             </div>
 
             <Card className="flex-1 flex flex-col bg-zinc-950/40 border-zinc-800/50 overflow-hidden relative shadow-2xl">
@@ -249,13 +265,14 @@ export default function BondPage() {
                             )}
                         </div>
 
-                        {/* Sticky Input */}
-                        <div className="p-4 bg-zinc-950/60 border-t border-zinc-800/50 backdrop-blur-md shrink-0">
-                            <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto">
-                                <div className="flex-1 relative">
+                        {/* Polished Input Area */}
+                        <div className="p-4 md:p-6 bg-zinc-950/80 border-t border-zinc-800/50 backdrop-blur-xl shrink-0">
+                            <form onSubmit={handleSendNote} className="flex gap-3 max-w-4xl mx-auto items-end">
+                                <div className="flex-1 relative group">
                                     <textarea
-                                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl py-3 px-4 pr-12 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-pink-500/30 transition-all resize-none h-12 flex items-center"
+                                        className="w-full bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 focus:border-pink-500/50 rounded-2xl py-3.5 px-5 pr-14 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-4 focus:ring-pink-500/5 transition-all resize-none min-h-[52px] max-h-32 custom-scrollbar-thin shadow-inner"
                                         placeholder="Type a message..."
+                                        rows={1}
                                         value={note}
                                         onChange={(e) => setNote(e.target.value)}
                                         onKeyDown={(e) => {
@@ -266,16 +283,16 @@ export default function BondPage() {
                                         }}
                                         maxLength={280}
                                     />
-                                    <div className="absolute right-3 bottom-3 text-[10px] text-zinc-700 font-bold">
+                                    <div className="absolute right-4 bottom-3.5 text-[9px] text-zinc-700 font-bold group-focus-within:text-pink-500/40 transition-colors">
                                         {note.length}/280
                                     </div>
                                 </div>
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting || !note.trim()}
-                                    className="bg-pink-600 hover:bg-pink-700 text-white rounded-2xl w-12 h-12 p-0 shrink-0 shadow-lg shadow-pink-900/20 active:scale-95 transition-all"
+                                    className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl w-[52px] h-[52px] p-0 shrink-0 shadow-xl shadow-pink-900/20 active:scale-90 transition-all group"
                                 >
-                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}
                                 </Button>
                             </form>
                         </div>
