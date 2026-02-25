@@ -18,7 +18,7 @@ declare global {
 
 export default function PlaygroundPage() {
     const { currentId } = useIdentity()
-    const [code, setCode] = useState('print("Hello Achu! 🚀")')
+    const [code, setCode] = useState('print("Hello Achu!")')
     const [output, setOutput] = useState('')
     const [isRunning, setIsRunning] = useState(false)
     const [isTyping, setIsTyping] = useState(false)
@@ -218,7 +218,7 @@ export default function PlaygroundPage() {
                             <span>{engineStatus === 'ready' ? 'Python 3.11' : 'Initializing...'}</span>
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => {
-                            if (confirm('Reset current code?')) setCode('print("Hello Achu! 🚀")')
+                            if (confirm('Reset current code?')) setCode('print("Hello Achu!")')
                         }}>
                             <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
