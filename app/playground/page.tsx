@@ -126,8 +126,8 @@ export default function PlaygroundPage() {
             await pyodide.runPython(`
                 import sys
                 import io
-                sys.stdout = io.String()
-                sys.stderr = io.String()
+                sys.stdout = io.StringIO()
+                sys.stderr = io.StringIO()
             `);
 
             await pyodide.runPythonAsync(code);
@@ -144,7 +144,7 @@ export default function PlaygroundPage() {
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
+        <div className="space-y-6 pb-20">
             <Script
                 src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
                 onLoad={initPyodide}

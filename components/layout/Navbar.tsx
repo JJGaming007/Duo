@@ -27,8 +27,8 @@ export function Navbar() {
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-4 backdrop-blur-lg md:hidden shadow-lg shadow-black">
                 <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-600 text-xs font-bold text-white shadow-lg shadow-green-900/20">
-                        CD
+                    <div className="flex px-2 h-7 items-center justify-center rounded-lg bg-green-600 text-[10px] font-bold text-white shadow-lg shadow-green-900/20">
+                        DUO
                     </div>
                     <span className="text-sm font-bold tracking-tight text-white">CodeTrack Duo</span>
                 </div>
@@ -49,8 +49,8 @@ export function Navbar() {
                 <div className="mx-auto max-w-lg md:max-w-7xl md:px-6">
                     <div className="flex h-16 items-center justify-between px-6 md:px-0">
                         <div className="hidden items-center gap-2 md:flex">
-                            <div className="h-8 w-8 rounded-lg bg-green-600 flex items-center justify-center font-bold text-white shadow-lg shadow-green-900/20">
-                                CD
+                            <div className="px-3 h-8 rounded-lg bg-green-600 flex items-center justify-center font-bold text-white shadow-lg shadow-green-900/20 italic">
+                                DUO
                             </div>
                             <span className="text-lg font-bold tracking-tight text-white">CodeTrack Duo</span>
                         </div>

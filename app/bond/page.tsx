@@ -161,7 +161,7 @@ export default function BondPage() {
     }
 
     return (
-        <div className="space-y-8 pb-[100px] animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="space-y-8 pb-[100px]">
             <header className="flex flex-col gap-2 relative">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -278,7 +278,7 @@ export default function BondPage() {
                                         square === 'O' ? "text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.3)]" : ""
                                     )}
                                 >
-                                    {square && <span className="animate-in zoom-in spin-in-12 duration-300">{square}</span>}
+                                    {square && <span className="duration-300">{square}</span>}
                                 </button>
                             ))}
                         </div>
