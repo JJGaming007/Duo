@@ -159,7 +159,7 @@ export default function PlaygroundPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] space-y-4 max-w-7xl mx-auto">
+        <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[750px] space-y-4 max-w-7xl mx-auto px-1 md:px-0">
             <Script
                 src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
                 onLoad={initPyodide}
@@ -259,7 +259,7 @@ export default function PlaygroundPage() {
 
                 {/* Dynamic Sliding Console */}
                 <div className={cn(
-                    "absolute bottom-0 left-0 right-0 bg-[#181818] border-t border-[#333333] transition-all duration-300 ease-in-out z-30 flex flex-col",
+                    "absolute bottom-6 md:bottom-6 left-0 right-0 bg-[#181818] border-t border-[#333333] transition-all duration-300 ease-in-out z-30 flex flex-col",
                     showConsole ? "h-1/3 md:h-[250px]" : "h-0"
                 )}>
                     <div className="h-8 shrink-0 flex items-center justify-between px-4 bg-[#252526] border-b border-[#1a1a1a]">
@@ -294,29 +294,30 @@ export default function PlaygroundPage() {
                         )}
                     </div>
                 </div>
-            </Card>
 
-            {/* Footer Status Bar */}
-            <footer className="h-6 bg-blue-600 px-3 flex items-center justify-between text-[10px] text-white font-medium shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 hover:bg-white/10 px-1 cursor-default">
-                        <Share2 className="h-3 w-3" />
-                        主 main*
+                {/* Footer Status Bar - Integrated into Card */}
+                <footer className="h-6 bg-[#007acc] px-3 flex items-center justify-between text-[9px] md:text-[10px] text-white font-medium shrink-0 z-40">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <div className="flex items-center gap-1 hover:bg-white/10 px-1 cursor-default">
+                            <Share2 className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                            <span className="hidden xs:inline">main*</span>
+                            <span className="xs:hidden">m*</span>
+                        </div>
+                        <div className="flex items-center gap-1 hover:bg-white/10 px-1">
+                            <RotateCcw className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                            0 Errors
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1 hover:bg-white/10 px-1">
-                        <RotateCcw className="h-3 w-3" />
-                        0 Errors
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <span className="hidden md:inline">UTF-8</span>
+                        <span>Python 3.11</span>
+                        <div className="flex items-center gap-1">
+                            <CheckCircle2 className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                            <span className="hidden sm:inline">Prettier</span>
+                        </div>
                     </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <span>UTF-8</span>
-                    <span>Python 3.11 (WASM)</span>
-                    <div className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Prettier
-                    </div>
-                </div>
-            </footer>
+                </footer>
+            </Card>
         </div>
     )
 }
