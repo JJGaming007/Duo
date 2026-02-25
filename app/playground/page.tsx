@@ -240,37 +240,38 @@ export default function PlaygroundPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[750px] p-4 md:p-6 space-y-4 max-w-7xl mx-auto overflow-hidden">
+        <div className="flex flex-col h-[calc(100dvh-7.5rem)] md:h-[750px] p-2 md:p-6 space-y-3 md:space-y-4 max-w-7xl mx-auto overflow-hidden">
             <Script
                 src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"
                 onLoad={initPyodide}
             />
 
             {/* Header Area */}
-            <header className="flex flex-col gap-2 shrink-0 px-1">
+            <header className="flex flex-col gap-2 shrink-0 px-2 md:px-1">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                            <Terminal className="h-5 w-5 text-blue-400" />
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="h-8 w-8 md:h-10 md:w-10 rounded-lg md:rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                            <Terminal className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
                         </div>
                         <div>
-                            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">Pyground</h1>
-                            <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest font-bold">VS Code Edition</p>
+                            <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-none">Pyground</h1>
+                            <p className="text-[9px] text-zinc-500 mt-0.5 uppercase tracking-widest font-bold">VS Code Edition</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
                         {isTyping && (
-                            <span className="text-[10px] text-blue-400 animate-pulse font-bold bg-blue-500/5 px-2 py-0.5 rounded-full border border-blue-500/10 hidden sm:inline">
+                            <span className="text-[9px] text-blue-400 animate-pulse font-bold bg-blue-500/5 px-2 py-0.5 rounded-full border border-blue-500/10 hidden sm:inline">
                                 Partner typing...
                             </span>
                         )}
                         <div className={cn(
-                            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all duration-500 shadow-lg",
+                            "flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider border transition-all duration-500 shadow-lg",
                             presenceCount > 1 ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-zinc-900 border-zinc-800 text-zinc-500"
                         )}>
-                            <div className={cn("h-1.5 w-1.5 rounded-full", presenceCount > 1 ? "bg-green-400 animate-pulse" : "bg-zinc-700")}></div>
-                            {presenceCount > 1 ? "Partner Online" : "Partner Offline"}
+                            <div className={cn("h-1 w-1 md:h-1.5 md:w-1.5 rounded-full", presenceCount > 1 ? "bg-green-400 animate-pulse" : "bg-zinc-700")}></div>
+                            <span className="hidden xs:inline">{presenceCount > 1 ? "Partner Online" : "Partner Offline"}</span>
+                            <span className="xs:hidden">{presenceCount > 1 ? "Online" : "Offline"}</span>
                         </div>
                     </div>
                 </div>
@@ -280,10 +281,10 @@ export default function PlaygroundPage() {
             <Card className="flex-1 flex flex-col bg-[#1e1e1e] border-zinc-800 overflow-hidden shadow-2xl relative">
 
                 {/* Editor Toolbar */}
-                <div className="h-10 flex items-center justify-between px-4 bg-[#252526] border-b border-[#1a1a1a] shrink-0">
-                    <div className="flex items-center gap-4 text-[11px] font-medium text-zinc-400">
-                        <div className="flex items-center gap-1.5 text-blue-400 border-b-2 border-blue-500 h-10 px-2 mt-[2px]">
-                            <Terminal className="h-3 w-3" />
+                <div className="h-8 md:h-10 flex items-center justify-between px-3 md:px-4 bg-[#252526] border-b border-[#1a1a1a] shrink-0">
+                    <div className="flex items-center gap-3 md:gap-4 text-[10px] md:text-[11px] font-medium text-zinc-400">
+                        <div className="flex items-center gap-1 md:gap-1.5 text-blue-400 border-b-2 border-blue-500 h-8 md:h-10 px-1 md:px-2 mt-[2px]">
+                            <Terminal className="h-2.5 w-2.5 md:h-3 md:w-3" />
                             main.py
                         </div>
                         {lastEditedBy && (
@@ -293,15 +294,15 @@ export default function PlaygroundPage() {
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/50 rounded text-[10px] text-zinc-500 mr-2">
-                            <Cpu className={cn("h-3 w-3", engineStatus === 'ready' ? "text-green-500" : "text-zinc-600")} />
-                            <span>{engineStatus === 'ready' ? 'Python 3.11' : 'Initializing...'}</span>
+                    <div className="flex items-center gap-1 md:gap-2">
+                        <div className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-0.5 md:py-1 bg-zinc-900/50 rounded text-[9px] md:text-[10px] text-zinc-500 mr-1 md:mr-2">
+                            <Cpu className={cn("h-2.5 w-2.5 md:h-3 md:w-3", engineStatus === 'ready' ? "text-green-500" : "text-zinc-600")} />
+                            <span>{engineStatus === 'ready' ? (window.innerWidth < 640 ? 'Py 3.11' : 'Python 3.11') : 'Init...'}</span>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => {
+                        <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7 text-zinc-400 hover:text-white" onClick={() => {
                             if (confirm('Reset current code?')) setCode('print("Hello Achu!")')
                         }}>
-                            <RotateCcw className="h-3.5 w-3.5" />
+                            <RotateCcw className="h-3 w-3 md:h-3.5 md:w-3.5" />
                         </Button>
                     </div>
                 </div>
@@ -309,17 +310,17 @@ export default function PlaygroundPage() {
                 {/* Editor Content with Line Numbers */}
                 <div className="flex-1 flex overflow-hidden relative group">
                     {/* Line Numbers */}
-                    <div className="w-10 bg-[#1e1e1e] flex flex-col items-center pt-5 text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
+                    <div className="w-8 md:w-10 bg-[#1e1e1e] flex flex-col items-center pt-4 md:pt-5 text-[11px] md:text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
                         {Array.from({ length: lineCount }).map((_, i) => (
                             <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                         ))}
                     </div>
 
                     {/* Editor Container */}
-                    <div className="flex-1 relative overflow-hidden font-mono text-[14px]">
+                    <div className="flex-1 relative overflow-hidden font-mono text-[13px] md:text-[14px]">
                         {/* Highlights Layer */}
                         <pre
-                            className="absolute inset-0 p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden"
+                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap break-all leading-[21px] text-transparent overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: highlightCode(code) + '\n' }}
                         />
 
@@ -329,20 +330,20 @@ export default function PlaygroundPage() {
                             value={code}
                             onChange={handleCodeChange}
                             onKeyDown={handleKeyDown}
-                            className="absolute inset-0 w-full h-full bg-transparent p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all"
+                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-[#d4d4d4] caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap break-all"
                             placeholder="# Write your Python code here..."
                             spellCheck={false}
                         />
                     </div>
 
                     {/* Floating Run Button for Mobile/Desktop */}
-                    <div className="absolute bottom-6 right-6 z-20">
+                    <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 z-20">
                         <Button
                             onClick={runCode}
                             disabled={isRunning || engineStatus !== 'ready'}
-                            className="h-12 w-12 md:h-auto md:w-auto md:px-6 rounded-full md:rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all"
+                            className="h-10 w-10 md:h-auto md:w-auto md:px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-2xl shadow-blue-500/30 active:scale-95 transition-all"
                         >
-                            {isRunning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5 fill-current" />}
+                            {isRunning ? <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <Play className="h-4 w-4 md:h-5 md:w-5 fill-current" />}
                             <span className="hidden md:inline">Run Code</span>
                         </Button>
                     </div>
@@ -351,11 +352,11 @@ export default function PlaygroundPage() {
                 {/* Dynamic Sliding Console */}
                 <div className={cn(
                     "absolute bottom-6 md:bottom-6 left-0 right-0 bg-[#181818] border-t border-[#333333] transition-all duration-300 ease-in-out z-30 flex flex-col",
-                    showConsole ? "h-1/3 md:h-[250px]" : "h-0"
+                    showConsole ? "h-[45%] md:h-[250px]" : "h-0"
                 )}>
                     <div className="h-8 shrink-0 flex items-center justify-between px-4 bg-[#252526] border-b border-[#1a1a1a]">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
-                            <Share2 className="h-3 w-3" />
+                        <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
+                            <Share2 className="h-2.5 w-2.5 md:h-3 md:w-3" />
                             Output Console
                         </span>
                         <div className="flex items-center gap-1">
@@ -369,7 +370,7 @@ export default function PlaygroundPage() {
                             </Button>
                         </div>
                     </div>
-                    <div className="flex-1 p-4 font-mono text-sm overflow-y-auto custom-scrollbar-thin bg-[#0f0f0f]">
+                    <div className="flex-1 p-3 md:p-4 font-mono text-xs md:text-sm overflow-y-auto custom-scrollbar-thin bg-[#0f0f0f]">
                         {output ? (
                             <pre className={cn(
                                 "whitespace-pre-wrap break-all",
@@ -379,15 +380,15 @@ export default function PlaygroundPage() {
                             </pre>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-2 opacity-50">
-                                <CheckCircle2 className="h-8 w-8" />
-                                <span className="text-xs">No output to display</span>
+                                <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8" />
+                                <span className="text-[10px] md:text-xs">No output to display</span>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Footer Status Bar - Integrated into Card */}
-                <footer className="h-6 bg-[#007acc] px-3 flex items-center justify-between text-[9px] md:text-[10px] text-white font-medium shrink-0 z-40">
+                <footer className="h-6 bg-[#007acc] px-2 md:px-3 flex items-center justify-between text-[8px] md:text-[10px] text-white font-medium shrink-0 z-40">
                     <div className="flex items-center gap-2 md:gap-4">
                         <div className="flex items-center gap-1 hover:bg-white/10 px-1 cursor-default">
                             <Share2 className="h-2.5 w-2.5 md:h-3 md:w-3" />
@@ -396,7 +397,8 @@ export default function PlaygroundPage() {
                         </div>
                         <div className="flex items-center gap-1 hover:bg-white/10 px-1">
                             <RotateCcw className="h-2.5 w-2.5 md:h-3 md:w-3" />
-                            0 Errors
+                            <span className="hidden xs:inline">0 Errors</span>
+                            <span className="xs:hidden">0 Err</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 md:gap-4">
@@ -412,4 +414,5 @@ export default function PlaygroundPage() {
         </div>
     )
 }
+
 
