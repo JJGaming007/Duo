@@ -10,6 +10,7 @@ import { pusherClient } from '@/lib/pusher'
 import { toast } from 'react-hot-toast'
 import useSWR from 'swr'
 import { cn } from '@/lib/utils'
+import { showOsNotification, requestNotificationPermission } from '@/lib/notifications'
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -40,8 +41,8 @@ export default function BondPage() {
             setLiveNotes(prev => [newNote, ...prev])
             if (newNote.senderId !== currentId) {
                 toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
-                if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-                    new Notification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
+                if (document.hidden) {
+                    showOsNotification('CodeTrack Duo', { body: `New note from ${newNote.senderName}! 💖` })
                 }
             }
         })
@@ -49,8 +50,8 @@ export default function BondPage() {
         noteChannel.bind('nudge', (data: any) => {
             if (data.senderId !== currentId) {
                 toast(`${data.senderName} nudged you! 👋`, { icon: '🔔' })
-                if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-                    new Notification('CodeTrack Duo', { body: `${data.senderName} nudged you! 👋` })
+                if (document.hidden) {
+                    showOsNotification('CodeTrack Duo', { body: `${data.senderName} nudged you! 👋` })
                 }
             }
         })
@@ -81,6 +82,7 @@ export default function BondPage() {
         if (!note.trim() || !currentId) return
 
         setIsSubmitting(true)
+        requestNotificationPermission()
         try {
             const res = await fetch('/api/bond', {
                 method: 'POST',
@@ -100,6 +102,7 @@ export default function BondPage() {
     const handleNudge = async () => {
         if (!currentId) return;
         toast.success("Nudge sent! 👋")
+        requestNotificationPermission()
         try {
             await fetch('/api/bond/nudge', {
                 method: 'POST',

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { useEffect } from 'react'
+import { requestNotificationPermission } from '@/lib/notifications'
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -20,12 +21,6 @@ export function Navbar() {
     const pathname = usePathname()
     const { currentId, switchUser } = useIdentity()
 
-    useEffect(() => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            Notification.requestPermission()
-        }
-    }, [])
-
     return (
         <>
             {/* Mobile Header */}
@@ -37,7 +32,10 @@ export function Navbar() {
                     <span className="text-sm font-bold tracking-tight text-white">CodeTrack Duo</span>
                 </div>
                 <button
-                    onClick={() => switchUser(currentId === 'user-1' ? 'user-2' : 'user-1')}
+                    onClick={() => {
+                        requestNotificationPermission();
+                        switchUser(currentId === 'user-1' ? 'user-2' : 'user-1');
+                    }}
                     className="flex h-8 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-[10px] font-bold text-zinc-400 transition-all hover:border-green-900/50 hover:text-green-400"
                     title="Switch User"
                 >
@@ -64,6 +62,7 @@ export function Navbar() {
                                     <Link
                                         key={item.href}
                                         href={item.href}
+                                        onClick={() => requestNotificationPermission()}
                                         className={cn(
                                             "flex flex-col items-center gap-1 transition-all duration-200 md:flex-row md:gap-2",
                                             isActive ? "text-green-500 scale-110 md:scale-100" : "text-zinc-500 hover:text-zinc-300"
@@ -78,7 +77,10 @@ export function Navbar() {
 
                         <div className="hidden md:flex items-center gap-3">
                             <button
-                                onClick={() => switchUser(currentId === 'user-1' ? 'user-2' : 'user-1')}
+                                onClick={() => {
+                                    requestNotificationPermission();
+                                    switchUser(currentId === 'user-1' ? 'user-2' : 'user-1');
+                                }}
                                 className="flex items-center gap-2 h-9 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-green-400 hover:border-green-900/50 transition-all text-xs font-bold"
                                 title="Switch User"
                             >
