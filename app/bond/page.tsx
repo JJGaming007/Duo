@@ -82,6 +82,7 @@ export default function BondPage() {
     const [showMoodPicker, setShowMoodPicker] = useState(false)
     const [showQuickEmojis, setShowQuickEmojis] = useState(false)
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+    const [selectedMessage, setSelectedMessage] = useState<string | null>(null)
 
     const [board, setBoard] = useState(Array(9).fill(null))
     const [xIsNext, setXIsNext] = useState(true)
@@ -424,13 +425,13 @@ export default function BondPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowMoodPicker(!showMoodPicker)}
-                            className="h-9 w-9 rounded-xl text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+                            className="h-9 w-9 rounded-xl text-zinc-400 hover:text-purple-400 active:text-purple-400 hover:bg-purple-500/10 transition-all"
                             title="Set Mood"
                         >
                             <span className="text-base">{myMood?.emoji || '😊'}</span>
                         </Button>
                         {showMoodPicker && (
-                            <div className="absolute right-0 top-11 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-3 z-50 min-w-[200px] animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="absolute right-0 top-11 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-3 z-50 w-[200px] animate-in fade-in slide-in-from-top-2 duration-200">
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-2 px-1">Set your mood</p>
                                 <div className="grid grid-cols-4 gap-1">
                                     {MOOD_OPTIONS.map(mood => (
@@ -503,7 +504,7 @@ export default function BondPage() {
                         <div
                             ref={messageContainerRef}
                             className="flex-1 overflow-y-auto px-3 md:px-4 py-3 custom-scrollbar bg-zinc-950/50"
-                            onClick={() => { setShowReactionPicker(null); setDeleteConfirm(null) }}
+                            onClick={() => { setShowReactionPicker(null); setDeleteConfirm(null); setSelectedMessage(null) }}
                         >
                             <div className="max-w-3xl mx-auto w-full space-y-1">
                                 {/* Date-grouped messages */}
@@ -572,6 +573,10 @@ export default function BondPage() {
                                                                 e.stopPropagation()
                                                                 setShowReactionPicker(showReactionPicker === n.id ? null : n.id)
                                                             }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setSelectedMessage(selectedMessage === n.id ? null : n.id)
+                                                            }}
                                                         >
                                                             {/* Content + Timestamp */}
                                                             <div className="flex items-end gap-2">
@@ -592,25 +597,27 @@ export default function BondPage() {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                        </div>
 
-                                                            {/* Action buttons on hover */}
+                                                        {/* Action buttons — shown on tap (mobile) or hover (desktop) */}
+                                                        {selectedMessage === n.id && (
                                                             <div className={cn(
-                                                                "absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity",
-                                                                isMine ? "-left-20" : "-right-20"
+                                                                "flex items-center gap-1 mt-1 animate-in fade-in zoom-in-95 duration-150",
+                                                                isMine ? "justify-end" : "justify-start"
                                                             )}>
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); setReplyTo(n) }}
-                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all"
+                                                                    onClick={(e) => { e.stopPropagation(); setReplyTo(n); setSelectedMessage(null) }}
+                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 active:text-white active:bg-zinc-700 transition-all"
                                                                     title="Reply"
                                                                 >
-                                                                    <Reply className="h-3 w-3" />
+                                                                    <Reply className="h-3.5 w-3.5" />
                                                                 </button>
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === n.id ? null : n.id) }}
-                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all"
+                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 active:text-white active:bg-zinc-700 transition-all"
                                                                     title="React"
                                                                 >
-                                                                    <SmilePlus className="h-3 w-3" />
+                                                                    <SmilePlus className="h-3.5 w-3.5" />
                                                                 </button>
                                                                 {isMine && (
                                                                     <button
@@ -627,22 +634,22 @@ export default function BondPage() {
                                                                             "h-7 w-7 rounded-lg border flex items-center justify-center transition-all",
                                                                             deleteConfirm === n.id
                                                                                 ? "bg-red-600/20 border-red-500/50 text-red-400"
-                                                                                : "bg-zinc-800/80 border-zinc-700/50 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
+                                                                                : "bg-zinc-800/80 border-zinc-700/50 text-zinc-400 active:text-red-400 active:bg-red-500/10"
                                                                         )}
-                                                                        title={deleteConfirm === n.id ? "Click again to confirm" : "Delete"}
+                                                                        title={deleteConfirm === n.id ? "Tap again to confirm" : "Delete"}
                                                                     >
-                                                                        <Trash2 className="h-3 w-3" />
+                                                                        <Trash2 className="h-3.5 w-3.5" />
                                                                     </button>
                                                                 )}
                                                             </div>
-                                                        </div>
+                                                        )}
 
                                                         {/* Reaction Picker */}
                                                         {showReactionPicker === n.id && (
                                                             <div
                                                                 className={cn(
-                                                                    "absolute z-50 flex items-center gap-0.5 bg-zinc-900 border border-zinc-700 rounded-full px-2 py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150",
-                                                                    isMine ? "right-0 -bottom-10" : "left-0 -bottom-10"
+                                                                    "flex items-center gap-0.5 bg-zinc-900 border border-zinc-700 rounded-full px-2 py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150 mt-1",
+                                                                    isMine ? "ml-auto" : "mr-auto"
                                                                 )}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >

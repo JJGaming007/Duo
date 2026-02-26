@@ -825,7 +825,7 @@ export default function PlaygroundPage() {
 
                     {/* Find & Replace Overlay */}
                     {showFind && (
-                        <div className="absolute top-2 right-4 z-50 bg-[#252526] border border-[#454545] rounded-lg shadow-2xl p-2 flex flex-col gap-2 min-w-[300px] animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="absolute top-2 left-2 right-2 md:left-auto md:right-4 z-50 bg-[#252526] border border-[#454545] rounded-lg shadow-2xl p-2 flex flex-col gap-2 md:min-w-[300px] animate-in fade-in slide-in-from-top-2 duration-150">
                             <div className="flex items-center gap-1">
                                 <input
                                     ref={findInputRef}
@@ -860,7 +860,7 @@ export default function PlaygroundPage() {
                     )}
 
                     {/* Line Numbers */}
-                    <div className="w-8 md:w-12 bg-[#1e1e1e] flex flex-col items-end pr-2 md:pr-3 pt-4 md:pt-5 text-[11px] md:text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
+                    <div className="w-8 md:w-12 bg-[#1e1e1e] flex flex-col items-end pr-1 md:pr-3 pt-3 md:pt-5 text-[10px] md:text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
                         {Array.from({ length: lineCount }).map((_, i) => (
                             <div key={i} className={cn(
                                 "h-[21px] leading-[21px] w-full text-right pr-1 transition-colors relative",
@@ -880,13 +880,13 @@ export default function PlaygroundPage() {
                         {/* Active Line Highlight */}
                         <div
                             className="absolute left-0 right-0 h-[21px] bg-[#2a2d2e] pointer-events-none transition-all z-[1]"
-                            style={{ top: `${(activeLine - 1) * 21 + (typeof window !== 'undefined' && window.innerWidth < 768 ? 16 : 20)}px` }}
+                            style={{ top: `${(activeLine - 1) * 21 + 12}px` }}
                         />
 
                         {/* Highlights Layer */}
                         <pre
                             ref={highlightsRef}
-                            className="absolute inset-0 p-4 md:p-5 pointer-events-none whitespace-pre-wrap leading-[21px] text-[#808080] overflow-hidden font-mono text-[13px] md:text-[14px] z-[2]"
+                            className="absolute inset-0 p-3 md:p-5 pointer-events-none whitespace-pre-wrap leading-[21px] text-[#808080] overflow-hidden font-mono text-[13px] z-[2]"
                             dangerouslySetInnerHTML={{ __html: highlightCode(code) + '\n' }}
                             style={{
                                 fontVariantLigatures: 'none',
@@ -908,7 +908,7 @@ export default function PlaygroundPage() {
                             onClick={updateCursorPosition}
                             onKeyUp={updateCursorPosition}
                             className={cn(
-                                "absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-transparent caret-white leading-[21px] custom-scrollbar z-10 font-mono text-[13px] md:text-[14px]",
+                                "absolute inset-0 w-full h-full bg-transparent p-3 md:p-5 resize-none focus:outline-none text-transparent caret-white leading-[21px] custom-scrollbar z-10 font-mono text-[13px]",
                                 wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
                             )}
                             placeholder="# Write your Python code here..."
