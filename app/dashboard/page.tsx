@@ -11,7 +11,6 @@ import { pusherClient } from '@/lib/pusher'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import useSWR from 'swr'
-import { showOsNotification } from '@/lib/notifications'
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -32,7 +31,6 @@ export default function DashboardPage() {
                     toast(`${data.userName || 'Partner'} just completed a day! 🚀`, {
                         icon: '👏',
                     })
-                    showOsNotification('CodeTrack Duo', { body: `${data.userName || 'Partner'} just completed a day! 🚀` })
                     mutate()
                 }
             })

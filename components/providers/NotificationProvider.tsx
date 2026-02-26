@@ -2,19 +2,30 @@
 
 import { useEffect, useRef } from 'react'
 import { useIdentity } from '@/lib/identity'
-import { getUserName } from '@/lib/constants'
-import { pusherClient } from '@/lib/pusher'
+import { pusherClient, setPusherUserId } from '@/lib/pusher'
 import { showOsNotification, registerServiceWorker, requestNotificationPermission } from '@/lib/notifications'
+import { usePathname } from 'next/navigation'
 
 /**
  * Global notification listener — always mounted via layout.tsx.
+ * This is the SINGLE SOURCE OF TRUTH for OS/push notifications.
+ * Individual pages should only handle in-app toasts and UI updates.
+ *
  * 1. Registers the service worker
  * 2. Subscribes to Web Push (for background/closed-app notifications)
- * 3. Subscribes to Pusher channels (for in-app notifications)
+ * 3. Subscribes to Pusher channels (for foreground OS notifications)
+ * 4. Suppresses OS notifications when user is actively viewing the relevant page
  */
 export default function NotificationProvider() {
     const { currentId } = useIdentity()
     const initializedRef = useRef(false)
+    const pathname = usePathname()
+    const pathnameRef = useRef(pathname)
+
+    // Keep pathname ref in sync without re-subscribing Pusher
+    useEffect(() => {
+        pathnameRef.current = pathname
+    }, [pathname])
 
     // Register service worker once
     useEffect(() => {
@@ -26,14 +37,21 @@ export default function NotificationProvider() {
         if (!currentId || initializedRef.current) return
         initializedRef.current = true
 
+        // Set the userId for Pusher auth requests (presence channels)
+        setPusherUserId(currentId)
+
         // Subscribe to Web Push for background notifications
         subscribeToPush(currentId)
 
-        // --- Pusher: Bond messages & nudges (in-app) ---
+        // --- Pusher: Bond messages & nudges (OS notifications) ---
         const bondChannel = pusherClient.subscribe('bond-update')
 
         bondChannel.bind('new-note', (newNote: any) => {
             if (newNote.senderId !== currentId) {
+                // Suppress OS notification if user is actively on the bond page
+                if (document.visibilityState === 'visible' && pathnameRef.current === '/bond') {
+                    return
+                }
                 showOsNotification(`💌 ${newNote.senderName}`, {
                     body: newNote.content?.substring(0, 100) || 'sent a message',
                 })
@@ -48,10 +66,10 @@ export default function NotificationProvider() {
             }
         })
 
-        // --- Pusher: Partner progress (in-app) ---
+        // --- Pusher: Partner progress (OS notifications) ---
         const progressChannel = pusherClient.subscribe('partner-progress')
 
-        progressChannel.bind('day-completed', (data: any) => {
+        progressChannel.bind('log-complete', (data: any) => {
             if (data.userId !== currentId) {
                 showOsNotification('🚀 Partner Update', {
                     body: `${data.userName || 'Your partner'} just completed a day!`,

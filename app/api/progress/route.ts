@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { pusherServer } from "@/lib/pusher";
 import { seedUsers } from "@/lib/db/seed";
+import { sendPushToPartner } from "@/lib/webpush";
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -39,12 +40,27 @@ export async function POST(req: Request) {
             set: { watched, practiced, projectDone, timeSpentMinutes, notes, date: today }
         });
 
-        // 2. Update Streak
+        // 2. Update Streak (with proper consecutive-day checking)
         const userStreak = await db.query.streaks.findFirst({
             where: eq(streaks.userId, userId)
         });
 
-        const newStreak = (userStreak?.currentStreak || 0) + 1;
+        let newStreak = 1;
+        if (userStreak?.lastCompletedDate) {
+            const lastDate = new Date(userStreak.lastCompletedDate);
+            const todayDate = new Date(today);
+            const diffMs = todayDate.getTime() - lastDate.getTime();
+            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) {
+                // Same day re-submission — keep streak unchanged
+                newStreak = userStreak.currentStreak || 1;
+            } else if (diffDays === 1) {
+                // Consecutive day — increment streak
+                newStreak = (userStreak.currentStreak || 0) + 1;
+            }
+            // diffDays > 1: streak resets to 1 (default)
+        }
         const newLongest = Math.max(userStreak?.longestStreak || 0, newStreak);
 
         await db.insert(streaks).values({
@@ -56,6 +72,7 @@ export async function POST(req: Request) {
             target: [streaks.userId],
             set: { currentStreak: newStreak, longestStreak: newLongest, lastCompletedDate: today, updatedAt: new Date() }
         });
+
 
         // 3. Increment XP
         let xpToAdd = 0;
@@ -70,10 +87,19 @@ export async function POST(req: Request) {
 
         // 4. Trigger Realtime Notification
         const { getUserName } = await import('@/lib/constants');
+        const userName = getUserName(userId);
         await pusherServer.trigger('partner-progress', 'log-complete', {
             userId,
-            userName: getUserName(userId),
+            userName,
         });
+
+        // 5. Web Push to partner (works when app is closed)
+        await sendPushToPartner(
+            userId,
+            '🚀 Partner Update',
+            `${userName} just completed Day ${courseDay}!`,
+            '/dashboard'
+        );
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
