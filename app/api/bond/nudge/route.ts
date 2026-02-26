@@ -4,7 +4,8 @@ import { sendPushToPartner } from "@/lib/webpush";
 
 export async function POST(req: Request) {
     try {
-        const { senderId, type } = await req.json();
+        const body = await req.json();
+        const { senderId, type } = body;
 
         if (!senderId) {
             return new NextResponse("Sender ID required", { status: 400 });
@@ -18,6 +19,26 @@ export async function POST(req: Request) {
             await pusherServer.trigger('bond-update', 'typing', {
                 senderId,
                 senderName
+            });
+            return NextResponse.json({ success: true });
+        }
+
+        // Handle emoji reaction on message (no push needed)
+        if (type === 'reaction') {
+            await pusherServer.trigger('bond-update', 'reaction', {
+                senderId,
+                messageId: body.messageId,
+                emoji: body.emoji,
+            });
+            return NextResponse.json({ success: true });
+        }
+
+        // Handle mood update (no push needed)
+        if (type === 'mood') {
+            await pusherServer.trigger('bond-update', 'mood', {
+                senderId,
+                emoji: body.emoji,
+                label: body.label,
             });
             return NextResponse.json({ success: true });
         }

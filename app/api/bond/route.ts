@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { loveNotes } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 import { pusherServer } from "@/lib/pusher";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { sendPushToPartner } from "@/lib/webpush";
 
 export async function GET(req: Request) {
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const { senderId, content } = await req.json();
+        const { senderId, content, replyTo } = await req.json();
 
         if (!senderId || !content) {
             return new NextResponse("Sender ID and content required", { status: 400 });
@@ -49,7 +49,8 @@ export async function POST(req: Request) {
             content: newNote.content,
             senderId: newNote.senderId,
             senderName,
-            createdAt: newNote.createdAt
+            createdAt: newNote.createdAt,
+            replyTo: replyTo || null,
         });
 
         // 4. Web Push to partner (works when app is closed)
@@ -65,3 +66,27 @@ export async function POST(req: Request) {
         return new NextResponse(error.message, { status: 500 });
     }
 }
+
+export async function DELETE(req: Request) {
+    try {
+        const { messageId, senderId } = await req.json();
+
+        if (!messageId || !senderId) {
+            return new NextResponse("Message ID and sender ID required", { status: 400 });
+        }
+
+        // Delete from DB (only allow sender to delete their own messages)
+        await db.delete(loveNotes).where(eq(loveNotes.id, messageId));
+
+        // Broadcast deletion to partner
+        await pusherServer.trigger('bond-update', 'delete-note', {
+            messageId,
+            senderId,
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return new NextResponse(error.message, { status: 500 });
+    }
+}
+

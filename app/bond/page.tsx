@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Loader2, User, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, RotateCcw, CheckCheck } from 'lucide-react'
+import { Loader2, User, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, RotateCcw, CheckCheck, Reply, Trash2, X, SmilePlus } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -11,8 +11,21 @@ import { toast } from 'react-hot-toast'
 import useSWR from 'swr'
 import { cn } from '@/lib/utils'
 
-
 const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+// Reaction emoji options
+const REACTION_EMOJIS = ['❤️', '😂', '😢', '🔥', '👏', '😮']
+const QUICK_EMOJIS = ['❤️', '🥰', '😘', '💕', '🫂', '✨', '👏', '🔥']
+const MOOD_OPTIONS = [
+    { emoji: '🎯', label: 'Focused' },
+    { emoji: '😊', label: 'Happy' },
+    { emoji: '😎', label: 'Chill' },
+    { emoji: '💪', label: 'Motivated' },
+    { emoji: '😴', label: 'Sleepy' },
+    { emoji: '😰', label: 'Stressed' },
+    { emoji: '🤔', label: 'Thinking' },
+    { emoji: '🎉', label: 'Celebrating' },
+]
 
 // Date formatting helpers
 const formatMessageDate = (dateStr: string) => {
@@ -35,7 +48,6 @@ const groupMessagesByDate = (messages: any[]) => {
     const groups: { date: string; messages: any[] }[] = []
     let currentDate = ''
 
-    // Messages come newest-first, reverse for grouping then reverse back
     const sorted = [...messages].reverse()
 
     sorted.forEach(msg => {
@@ -60,6 +72,16 @@ export default function BondPage() {
     const [partnerTyping, setPartnerTyping] = useState(false)
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const lastTypingSentRef = useRef(0)
+
+    // New feature state
+    const [reactions, setReactions] = useState<Record<string, string[]>>({})
+    const [replyTo, setReplyTo] = useState<any | null>(null)
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null)
+    const [myMood, setMyMood] = useState<{ emoji: string; label: string } | null>(null)
+    const [partnerMood, setPartnerMood] = useState<{ emoji: string; label: string } | null>(null)
+    const [showMoodPicker, setShowMoodPicker] = useState(false)
+    const [showQuickEmojis, setShowQuickEmojis] = useState(false)
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
     const [board, setBoard] = useState(Array(9).fill(null))
     const [xIsNext, setXIsNext] = useState(true)
@@ -93,10 +115,14 @@ export default function BondPage() {
         const savedNotes = localStorage.getItem('bond-messages')
         const savedBoard = localStorage.getItem('bond-board')
         const savedXIsNext = localStorage.getItem('bond-xIsNext')
+        const savedReactions = localStorage.getItem('bond-reactions')
+        const savedMood = localStorage.getItem('bond-my-mood')
 
         if (savedNotes) setLiveNotes(JSON.parse(savedNotes))
         if (savedBoard) setBoard(JSON.parse(savedBoard))
         if (savedXIsNext) setXIsNext(JSON.parse(savedXIsNext))
+        if (savedReactions) setReactions(JSON.parse(savedReactions))
+        if (savedMood) setMyMood(JSON.parse(savedMood))
     }, [])
 
     useEffect(() => {
@@ -116,6 +142,13 @@ export default function BondPage() {
         localStorage.setItem('bond-board', JSON.stringify(board))
         localStorage.setItem('bond-xIsNext', JSON.stringify(xIsNext))
     }, [board, xIsNext])
+
+    // Persist reactions
+    useEffect(() => {
+        if (Object.keys(reactions).length > 0) {
+            localStorage.setItem('bond-reactions', JSON.stringify(reactions))
+        }
+    }, [reactions])
 
     useEffect(() => {
         if (!currentId) return
@@ -142,6 +175,29 @@ export default function BondPage() {
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
                 typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
             }
+        })
+
+        // Listen for reactions from partner
+        noteChannel.bind('reaction', (data: any) => {
+            if (data.senderId !== currentId) {
+                setReactions(prev => {
+                    const msgReactions = prev[data.messageId] || []
+                    if (msgReactions.includes(data.emoji)) return prev
+                    return { ...prev, [data.messageId]: [...msgReactions, data.emoji] }
+                })
+            }
+        })
+
+        // Listen for mood updates from partner
+        noteChannel.bind('mood', (data: any) => {
+            if (data.senderId !== currentId) {
+                setPartnerMood({ emoji: data.emoji, label: data.label })
+            }
+        })
+
+        // Listen for message deletes
+        noteChannel.bind('delete-note', (data: any) => {
+            setLiveNotes(prev => prev.filter(n => n.id !== data.messageId))
         })
 
         const tttChannel = pusherClient.subscribe('bond-tictactoe')
@@ -173,10 +229,15 @@ export default function BondPage() {
             const res = await fetch('/api/bond', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ senderId: currentId, content: note }),
+                body: JSON.stringify({
+                    senderId: currentId,
+                    content: note,
+                    replyTo: replyTo ? { id: replyTo.id, content: replyTo.content?.substring(0, 80), senderName: replyTo.senderName } : undefined,
+                }),
             })
             if (res.ok) {
                 setNote('')
+                setReplyTo(null)
                 if (textareaRef.current) {
                     textareaRef.current.style.height = '44px'
                 }
@@ -185,6 +246,20 @@ export default function BondPage() {
             toast.error("Failed to send note.")
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleQuickEmoji = async (emoji: string) => {
+        if (!currentId) return
+        setShowQuickEmojis(false)
+        try {
+            await fetch('/api/bond', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senderId: currentId, content: emoji }),
+            })
+        } catch (error) {
+            toast.error("Failed to send emoji.")
         }
     }
 
@@ -211,6 +286,55 @@ export default function BondPage() {
             })
         } catch (error) {
             console.error(error)
+        }
+    }
+
+    const handleReaction = async (messageId: string, emoji: string) => {
+        if (!currentId) return
+        setShowReactionPicker(null)
+
+        // Update local state
+        setReactions(prev => {
+            const msgReactions = prev[messageId] || []
+            if (msgReactions.includes(emoji)) {
+                // Toggle off
+                return { ...prev, [messageId]: msgReactions.filter(e => e !== emoji) }
+            }
+            return { ...prev, [messageId]: [...msgReactions, emoji] }
+        })
+
+        // Broadcast via Pusher
+        fetch('/api/bond/nudge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentId, type: 'reaction', messageId, emoji })
+        }).catch(() => { })
+    }
+
+    const handleSetMood = async (mood: { emoji: string; label: string }) => {
+        if (!currentId) return
+        setMyMood(mood)
+        setShowMoodPicker(false)
+        localStorage.setItem('bond-my-mood', JSON.stringify(mood))
+
+        fetch('/api/bond/nudge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentId, type: 'mood', ...mood })
+        }).catch(() => { })
+    }
+
+    const handleDeleteMessage = async (messageId: string) => {
+        setDeleteConfirm(null)
+        setLiveNotes(prev => prev.filter(n => n.id !== messageId))
+        try {
+            await fetch('/api/bond', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messageId, senderId: currentId })
+            })
+        } catch (error) {
+            toast.error("Failed to delete message")
         }
     }
 
@@ -267,20 +391,65 @@ export default function BondPage() {
             {/* Header */}
             <header className="flex items-center justify-between shrink-0 px-4 md:px-5 py-2.5 md:py-3 bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-800 z-20">
                 <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-pink-900/30">
-                        {partnerName.charAt(0).toUpperCase()}
+                    <div className="relative">
+                        <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-pink-900/30">
+                            {partnerName.charAt(0).toUpperCase()}
+                        </div>
+                        {/* Online dot */}
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-zinc-900" />
                     </div>
                     <div>
-                        <h1 className="text-[15px] md:text-base font-bold text-white leading-tight tracking-tight">{partnerName}</h1>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-[15px] md:text-base font-bold text-white leading-tight tracking-tight">{partnerName}</h1>
+                            {partnerMood && (
+                                <span className="text-xs bg-zinc-800 px-1.5 py-0.5 rounded-full border border-zinc-700/50">
+                                    {partnerMood.emoji}
+                                </span>
+                            )}
+                        </div>
                         <p className="text-[11px] leading-tight">
                             {partnerTyping
                                 ? <span className="text-green-400 animate-pulse">typing...</span>
-                                : <span className="text-zinc-500">your partner 💕</span>
+                                : partnerMood
+                                    ? <span className="text-zinc-500">{partnerMood.label} {partnerMood.emoji}</span>
+                                    : <span className="text-zinc-500">your partner 💕</span>
                             }
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
+                    {/* Mood picker */}
+                    <div className="relative">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowMoodPicker(!showMoodPicker)}
+                            className="h-9 w-9 rounded-xl text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+                            title="Set Mood"
+                        >
+                            <span className="text-base">{myMood?.emoji || '😊'}</span>
+                        </Button>
+                        {showMoodPicker && (
+                            <div className="absolute right-0 top-11 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-3 z-50 min-w-[200px] animate-in fade-in slide-in-from-top-2 duration-200">
+                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-2 px-1">Set your mood</p>
+                                <div className="grid grid-cols-4 gap-1">
+                                    {MOOD_OPTIONS.map(mood => (
+                                        <button
+                                            key={mood.label}
+                                            onClick={() => handleSetMood(mood)}
+                                            className={cn(
+                                                "flex flex-col items-center gap-0.5 p-2 rounded-xl transition-all hover:bg-zinc-800",
+                                                myMood?.label === mood.label && "bg-zinc-800 ring-1 ring-purple-500/30"
+                                            )}
+                                        >
+                                            <span className="text-lg">{mood.emoji}</span>
+                                            <span className="text-[8px] text-zinc-500 font-medium">{mood.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <Button
                         variant="ghost"
                         size="icon"
@@ -334,6 +503,7 @@ export default function BondPage() {
                         <div
                             ref={messageContainerRef}
                             className="flex-1 overflow-y-auto px-3 md:px-4 py-3 custom-scrollbar bg-zinc-950/50"
+                            onClick={() => { setShowReactionPicker(null); setDeleteConfirm(null) }}
                         >
                             <div className="max-w-3xl mx-auto w-full space-y-1">
                                 {/* Date-grouped messages */}
@@ -352,12 +522,14 @@ export default function BondPage() {
                                         {group.messages.map((n: any, mi: number) => {
                                             const isMine = n.senderId === currentId
                                             const isConsecutive = mi > 0 && group.messages[mi - 1].senderId === n.senderId
+                                            const msgReactions = reactions[n.id] || []
+                                            const isOnlyEmoji = /^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]{1,3}$/u.test(n.content?.trim() || '')
 
                                             return (
                                                 <div
                                                     key={n.id || mi}
                                                     className={cn(
-                                                        "flex w-full",
+                                                        "flex w-full group/msg",
                                                         isMine ? "justify-end" : "justify-start",
                                                         isConsecutive ? "mt-[3px]" : "mt-2.5"
                                                     )}
@@ -370,28 +542,135 @@ export default function BondPage() {
                                                             </p>
                                                         )}
 
+                                                        {/* Reply preview if this is a reply */}
+                                                        {n.replyTo && (
+                                                            <div className={cn(
+                                                                "mx-3 mb-1 px-3 py-1.5 rounded-xl text-[11px] border-l-2",
+                                                                isMine
+                                                                    ? "bg-green-900/10 border-green-500/40 text-green-300/60"
+                                                                    : "bg-zinc-800/40 border-pink-500/40 text-zinc-400"
+                                                            )}>
+                                                                <span className="font-semibold text-[10px]">{n.replyTo.senderName}</span>
+                                                                <p className="truncate">{n.replyTo.content}</p>
+                                                            </div>
+                                                        )}
+
                                                         {/* Message Bubble */}
-                                                        <div className={cn(
-                                                            "relative px-3.5 py-2 md:px-4 md:py-2.5 rounded-2xl shadow-sm",
-                                                            isMine
-                                                                ? "bg-green-600/15 border border-green-500/20 rounded-br-md"
-                                                                : "bg-zinc-800/80 border border-zinc-700/40 rounded-bl-md"
-                                                        )}>
+                                                        <div
+                                                            className={cn(
+                                                                "relative rounded-2xl shadow-sm",
+                                                                isOnlyEmoji
+                                                                    ? "bg-transparent border-none px-2 py-1"
+                                                                    : cn(
+                                                                        "px-3.5 py-2 md:px-4 md:py-2.5",
+                                                                        isMine
+                                                                            ? "bg-green-600/15 border border-green-500/20 rounded-br-md"
+                                                                            : "bg-zinc-800/80 border border-zinc-700/40 rounded-bl-md"
+                                                                    )
+                                                            )}
+                                                            onDoubleClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setShowReactionPicker(showReactionPicker === n.id ? null : n.id)
+                                                            }}
+                                                        >
                                                             {/* Content + Timestamp */}
                                                             <div className="flex items-end gap-2">
-                                                                <p className="text-[14px] md:text-[15px] text-zinc-100 whitespace-pre-wrap leading-[1.4] flex-1 break-words">
+                                                                <p className={cn(
+                                                                    "text-zinc-100 whitespace-pre-wrap leading-[1.4] flex-1 break-words",
+                                                                    isOnlyEmoji ? "text-4xl md:text-5xl" : "text-[14px] md:text-[15px]"
+                                                                )}>
                                                                     {n.content}
                                                                 </p>
-                                                                <div className="flex items-center gap-0.5 shrink-0 -mb-0.5 ml-1">
-                                                                    <span className="text-[10px] text-zinc-500 leading-none">
-                                                                        {formatTime(n.createdAt)}
-                                                                    </span>
-                                                                    {isMine && (
-                                                                        <CheckCheck className="h-3.5 w-3.5 text-green-400 ml-0.5" />
-                                                                    )}
-                                                                </div>
+                                                                {!isOnlyEmoji && (
+                                                                    <div className="flex items-center gap-0.5 shrink-0 -mb-0.5 ml-1">
+                                                                        <span className="text-[10px] text-zinc-500 leading-none">
+                                                                            {formatTime(n.createdAt)}
+                                                                        </span>
+                                                                        {isMine && (
+                                                                            <CheckCheck className="h-3.5 w-3.5 text-green-400 ml-0.5" />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Action buttons on hover */}
+                                                            <div className={cn(
+                                                                "absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity",
+                                                                isMine ? "-left-20" : "-right-20"
+                                                            )}>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setReplyTo(n) }}
+                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all"
+                                                                    title="Reply"
+                                                                >
+                                                                    <Reply className="h-3 w-3" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === n.id ? null : n.id) }}
+                                                                    className="h-7 w-7 rounded-lg bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all"
+                                                                    title="React"
+                                                                >
+                                                                    <SmilePlus className="h-3 w-3" />
+                                                                </button>
+                                                                {isMine && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            if (deleteConfirm === n.id) {
+                                                                                handleDeleteMessage(n.id)
+                                                                            } else {
+                                                                                setDeleteConfirm(n.id)
+                                                                                setTimeout(() => setDeleteConfirm(null), 3000)
+                                                                            }
+                                                                        }}
+                                                                        className={cn(
+                                                                            "h-7 w-7 rounded-lg border flex items-center justify-center transition-all",
+                                                                            deleteConfirm === n.id
+                                                                                ? "bg-red-600/20 border-red-500/50 text-red-400"
+                                                                                : "bg-zinc-800/80 border-zinc-700/50 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
+                                                                        )}
+                                                                        title={deleteConfirm === n.id ? "Click again to confirm" : "Delete"}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
+
+                                                        {/* Reaction Picker */}
+                                                        {showReactionPicker === n.id && (
+                                                            <div
+                                                                className={cn(
+                                                                    "absolute z-50 flex items-center gap-0.5 bg-zinc-900 border border-zinc-700 rounded-full px-2 py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150",
+                                                                    isMine ? "right-0 -bottom-10" : "left-0 -bottom-10"
+                                                                )}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                {REACTION_EMOJIS.map(emoji => (
+                                                                    <button
+                                                                        key={emoji}
+                                                                        onClick={() => handleReaction(n.id, emoji)}
+                                                                        className={cn(
+                                                                            "text-lg hover:scale-125 transition-transform p-1 rounded-full",
+                                                                            msgReactions.includes(emoji) && "bg-zinc-800"
+                                                                        )}
+                                                                    >
+                                                                        {emoji}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Reactions display */}
+                                                        {msgReactions.length > 0 && (
+                                                            <div className={cn("flex items-center gap-0.5 mt-0.5", isMine ? "justify-end mr-2" : "justify-start ml-2")}>
+                                                                <div className="flex items-center bg-zinc-800/80 border border-zinc-700/40 rounded-full px-1.5 py-0.5 gap-0.5">
+                                                                    {msgReactions.map((emoji, i) => (
+                                                                        <span key={i} className="text-xs">{emoji}</span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )
@@ -416,9 +695,51 @@ export default function BondPage() {
                             </div>
                         </div>
 
+                        {/* Reply Preview Bar */}
+                        {replyTo && (
+                            <div className="px-3 md:px-4 py-2 bg-zinc-900/90 border-t border-zinc-800 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200 shrink-0">
+                                <div className="h-8 w-1 rounded-full bg-green-500 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-green-400 font-bold">{replyTo.senderName || (replyTo.senderId === currentId ? getUserName(currentId || 'user-1') : partnerName)}</p>
+                                    <p className="text-[12px] text-zinc-400 truncate">{replyTo.content}</p>
+                                </div>
+                                <button onClick={() => setReplyTo(null)} className="text-zinc-500 hover:text-white transition-colors">
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
+
                         {/* Input Bar */}
                         <div className="px-2 md:px-3 py-2 md:py-2.5 bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-800 shrink-0 safe-pb">
                             <form onSubmit={handleSendNote} className="flex gap-2 max-w-3xl mx-auto items-end">
+                                {/* Quick Emoji Toggle */}
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowQuickEmojis(!showQuickEmojis)}
+                                        className={cn(
+                                            "h-[44px] w-[44px] rounded-xl flex items-center justify-center shrink-0 transition-all",
+                                            showQuickEmojis ? "bg-pink-500/10 text-pink-400" : "text-zinc-500 hover:text-zinc-300"
+                                        )}
+                                    >
+                                        <Heart className="h-5 w-5" />
+                                    </button>
+                                    {showQuickEmojis && (
+                                        <div className="absolute bottom-14 left-0 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-2 flex gap-1 animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+                                            {QUICK_EMOJIS.map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    type="button"
+                                                    onClick={() => handleQuickEmoji(emoji)}
+                                                    className="text-xl hover:scale-125 transition-transform p-1.5 rounded-xl hover:bg-zinc-800"
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="flex-1 flex items-center bg-zinc-800 border border-zinc-700/50 rounded-2xl px-4 min-h-[44px] focus-within:border-green-500/30 transition-colors">
                                     <textarea
                                         ref={textareaRef}
@@ -524,6 +845,14 @@ export default function BondPage() {
                     </div>
                 )}
             </div>
+
+            {/* Close any open pickers when clicking outside */}
+            {(showMoodPicker || showQuickEmojis) && (
+                <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => { setShowMoodPicker(false); setShowQuickEmojis(false) }}
+                />
+            )}
         </div>
     )
 }

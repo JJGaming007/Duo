@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, Copy, Search, ArrowDown } from 'lucide-react'
+import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, Copy, Search, ArrowDown, ArrowUp, Replace, X, Code2, History, WrapText } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import { pusherClient } from '@/lib/pusher'
@@ -44,6 +44,28 @@ export default function PlaygroundPage() {
     const [pyodide, setPyodide] = useState<any>(null)
     const [engineStatus, setEngineStatus] = useState<'loading' | 'ready' | 'error'>('loading')
     const [showConsole, setShowConsole] = useState(false)
+
+    // Find & Replace state
+    const [showFind, setShowFind] = useState(false)
+    const [findText, setFindText] = useState('')
+    const [replaceText, setReplaceText] = useState('')
+    const [showReplace, setShowReplace] = useState(false)
+    const [findMatches, setFindMatches] = useState(0)
+    const [currentMatch, setCurrentMatch] = useState(0)
+    const findInputRef = useRef<HTMLInputElement>(null)
+
+    // Snippets state
+    const [showSnippets, setShowSnippets] = useState(false)
+
+    // Execution history
+    const [execHistory, setExecHistory] = useState<{ code: string; output: string; time: number; ts: number }[]>([])
+    const [showHistory, setShowHistory] = useState(false)
+
+    // Partner cursor
+    const [partnerCursorLine, setPartnerCursorLine] = useState<number | null>(null)
+
+    // Word wrap
+    const [wordWrap, setWordWrap] = useState(true)
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -104,6 +126,10 @@ export default function PlaygroundPage() {
             setLineCount(savedCode.split('\n').length)
         }
         if (savedLastEditedBy) setLastEditedBy(savedLastEditedBy)
+
+        // Load execution history
+        const savedHistory = localStorage.getItem('playground-exec-history')
+        if (savedHistory) setExecHistory(JSON.parse(savedHistory))
     }, [])
 
     // Sync from server whenever SWR revalidates (on mount, focus, navigation)
@@ -163,6 +189,9 @@ export default function PlaygroundPage() {
                 } else if (data.type === 'typing') {
                     setIsTyping(true)
                     setTimeout(() => setIsTyping(false), 2000)
+                } else if (data.type === 'cursor') {
+                    setPartnerCursorLine(data.line)
+                    setTimeout(() => setPartnerCursorLine(null), 5000)
                 }
             }
         })
@@ -201,7 +230,13 @@ export default function PlaygroundPage() {
         setCursorLine(ln)
         setCursorCol(col)
         setActiveLine(ln)
-    }, [code])
+
+        // Broadcast cursor position to partner
+        fetch('/api/playground/sync', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'cursor', senderId: currentId, line: ln })
+        }).catch(() => { })
+    }, [code, currentId])
 
     const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newCode = e.target.value
@@ -372,6 +407,24 @@ export default function PlaygroundPage() {
             return
         }
 
+        // Ctrl+F → Find
+        if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            setShowFind(true)
+            setShowReplace(false)
+            setTimeout(() => findInputRef.current?.focus(), 50)
+            return
+        }
+
+        // Ctrl+H → Find & Replace
+        if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            setShowFind(true)
+            setShowReplace(true)
+            setTimeout(() => findInputRef.current?.focus(), 50)
+            return
+        }
+
         // Ctrl+D → Duplicate Line
         if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault()
@@ -538,13 +591,117 @@ export default function PlaygroundPage() {
             setErrorCount(1)
         } finally {
             const endTime = performance.now()
-            setExecutionTime(Math.round(endTime - startTime))
+            const elapsed = Math.round(endTime - startTime)
+            setExecutionTime(elapsed)
             setIsRunning(false)
+
+            // Save to execution history
+            setExecHistory(prev => {
+                const entry = { code, output: output || '', time: elapsed, ts: Date.now() }
+                const updated = [entry, ...prev].slice(0, 10)
+                localStorage.setItem('playground-exec-history', JSON.stringify(updated))
+                return updated
+            })
         }
     }
 
     const handleCopyCode = () => {
         navigator.clipboard.writeText(code)
+    }
+
+    // Find match counting
+    useEffect(() => {
+        if (!findText) {
+            setFindMatches(0)
+            setCurrentMatch(0)
+            return
+        }
+        try {
+            const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+            const matches = code.match(regex)
+            setFindMatches(matches?.length || 0)
+            setCurrentMatch(matches && matches.length > 0 ? 1 : 0)
+        } catch {
+            setFindMatches(0)
+        }
+    }, [findText, code])
+
+    const findNext = () => {
+        if (!findText || !textareaRef.current) return
+        const start = textareaRef.current.selectionEnd
+        const idx = code.toLowerCase().indexOf(findText.toLowerCase(), start)
+        if (idx >= 0) {
+            textareaRef.current.selectionStart = idx
+            textareaRef.current.selectionEnd = idx + findText.length
+            textareaRef.current.focus()
+            setCurrentMatch(prev => Math.min(prev + 1, findMatches))
+        } else {
+            // Wrap around
+            const wrapIdx = code.toLowerCase().indexOf(findText.toLowerCase())
+            if (wrapIdx >= 0) {
+                textareaRef.current.selectionStart = wrapIdx
+                textareaRef.current.selectionEnd = wrapIdx + findText.length
+                textareaRef.current.focus()
+                setCurrentMatch(1)
+            }
+        }
+    }
+
+    const findPrev = () => {
+        if (!findText || !textareaRef.current) return
+        const end = textareaRef.current.selectionStart
+        const idx = code.toLowerCase().lastIndexOf(findText.toLowerCase(), end - 1)
+        if (idx >= 0) {
+            textareaRef.current.selectionStart = idx
+            textareaRef.current.selectionEnd = idx + findText.length
+            textareaRef.current.focus()
+            setCurrentMatch(prev => Math.max(prev - 1, 1))
+        }
+    }
+
+    const handleReplace = () => {
+        if (!findText || !textareaRef.current) return
+        const start = textareaRef.current.selectionStart
+        const end = textareaRef.current.selectionEnd
+        const selected = code.substring(start, end)
+        if (selected.toLowerCase() === findText.toLowerCase()) {
+            const newCode = code.substring(0, start) + replaceText + code.substring(end)
+            setCode(newCode)
+            findNext()
+        } else {
+            findNext()
+        }
+    }
+
+    const handleReplaceAll = () => {
+        if (!findText) return
+        const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+        setCode(code.replace(regex, replaceText))
+    }
+
+    const SNIPPETS = [
+        { label: 'Hello World', code: 'print("Hello, World!")' },
+        { label: 'For Loop', code: 'for i in range(10):\n    print(i)' },
+        { label: 'Function', code: 'def greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Achu"))' },
+        { label: 'Class', code: 'class Person:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n\n    def greet(self):\n        return f"Hi, I\'m {self.name}"' },
+        { label: 'List Comprehension', code: 'squares = [x**2 for x in range(10)]\nprint(squares)' },
+        { label: 'Try/Except', code: 'try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    print("Cannot divide by zero!")' },
+        { label: 'File I/O', code: '# Note: File I/O not available in browser\ndata = "Hello, File!"\nprint(data)' },
+        { label: 'Dictionary', code: 'student = {\n    "name": "Jibin",\n    "age": 20,\n    "grade": "A"\n}\n\nfor key, value in student.items():\n    print(f"{key}: {value}")' },
+    ]
+
+    const insertSnippet = (snippetCode: string) => {
+        if (!textareaRef.current) return
+        const cursorPos = textareaRef.current.selectionStart
+        const newCode = code.substring(0, cursorPos) + snippetCode + code.substring(cursorPos)
+        setCode(newCode)
+        setShowSnippets(false)
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.selectionStart = textareaRef.current.selectionEnd = cursorPos + snippetCode.length
+                textareaRef.current.focus()
+            }
+        }, 0)
     }
 
     return (
@@ -607,6 +764,51 @@ export default function PlaygroundPage() {
                             <Cpu className={cn("h-2.5 w-2.5 md:h-3 md:w-3", engineStatus === 'ready' ? "text-green-500" : "text-zinc-600")} />
                             <span>{engineStatus === 'ready' ? 'Python 3.11' : 'Init...'}</span>
                         </div>
+                        <div className="relative">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7 text-zinc-400 hover:text-yellow-400" onClick={() => setShowSnippets(!showSnippets)} title="Code Snippets">
+                                <Code2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                            </Button>
+                            {showSnippets && (
+                                <div className="absolute right-0 top-9 bg-[#252526] border border-[#454545] rounded-lg shadow-2xl z-50 min-w-[220px] max-h-[300px] overflow-y-auto">
+                                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold px-3 py-2 border-b border-[#333]">Insert Snippet</p>
+                                    {SNIPPETS.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => insertSnippet(s.code)}
+                                            className="w-full text-left px-3 py-2 text-[11px] text-zinc-300 hover:bg-[#094771] transition-colors flex items-center gap-2"
+                                        >
+                                            <Code2 className="h-3 w-3 text-blue-400 shrink-0" />
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7 text-zinc-400 hover:text-purple-400" onClick={() => setShowHistory(!showHistory)} title="Execution History">
+                                <History className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                            </Button>
+                            {showHistory && (
+                                <div className="absolute right-0 top-9 bg-[#252526] border border-[#454545] rounded-lg shadow-2xl z-50 min-w-[280px] max-h-[350px] overflow-y-auto">
+                                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold px-3 py-2 border-b border-[#333]">Recent Runs</p>
+                                    {execHistory.length === 0 ? (
+                                        <p className="px-3 py-4 text-[11px] text-zinc-600 text-center">No runs yet</p>
+                                    ) : execHistory.map((h, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => { setCode(h.code); setShowHistory(false) }}
+                                            className="w-full text-left px-3 py-2 text-[11px] border-b border-[#333] hover:bg-[#094771] transition-colors"
+                                        >
+                                            <div className="flex items-center justify-between text-zinc-400">
+                                                <span className="text-[9px]">{new Date(h.ts).toLocaleTimeString()}</span>
+                                                <span className="text-[9px] text-zinc-600">{h.time}ms</span>
+                                            </div>
+                                            <p className="text-zinc-300 truncate mt-0.5 font-mono text-[10px]">{h.code.split('\n')[0]}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7 text-zinc-400 hover:text-white" onClick={handleCopyCode} title="Copy Code">
                             <Copy className="h-3 w-3 md:h-3.5 md:w-3.5" />
                         </Button>
@@ -620,13 +822,56 @@ export default function PlaygroundPage() {
 
                 {/* Editor Content with Line Numbers */}
                 <div className="flex-1 flex overflow-hidden relative group">
+
+                    {/* Find & Replace Overlay */}
+                    {showFind && (
+                        <div className="absolute top-2 right-4 z-50 bg-[#252526] border border-[#454545] rounded-lg shadow-2xl p-2 flex flex-col gap-2 min-w-[300px] animate-in fade-in slide-in-from-top-2 duration-150">
+                            <div className="flex items-center gap-1">
+                                <input
+                                    ref={findInputRef}
+                                    type="text"
+                                    value={findText}
+                                    onChange={(e) => setFindText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') findNext(); if (e.key === 'Escape') setShowFind(false) }}
+                                    placeholder="Find..."
+                                    className="flex-1 bg-[#3c3c3c] border border-[#555] text-zinc-200 text-[12px] px-2 py-1 rounded focus:outline-none focus:border-blue-500"
+                                />
+                                <span className="text-[10px] text-zinc-500 min-w-[40px] text-center">{findMatches > 0 ? `${currentMatch}/${findMatches}` : 'No results'}</span>
+                                <button onClick={findPrev} className="p-1 hover:bg-[#3c3c3c] rounded"><ArrowUp className="h-3.5 w-3.5 text-zinc-400" /></button>
+                                <button onClick={findNext} className="p-1 hover:bg-[#3c3c3c] rounded"><ArrowDown className="h-3.5 w-3.5 text-zinc-400" /></button>
+                                <button onClick={() => setShowReplace(!showReplace)} className="p-1 hover:bg-[#3c3c3c] rounded"><Replace className="h-3.5 w-3.5 text-zinc-400" /></button>
+                                <button onClick={() => { setShowFind(false); setFindText('') }} className="p-1 hover:bg-[#3c3c3c] rounded"><X className="h-3.5 w-3.5 text-zinc-400" /></button>
+                            </div>
+                            {showReplace && (
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="text"
+                                        value={replaceText}
+                                        onChange={(e) => setReplaceText(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleReplace() }}
+                                        placeholder="Replace..."
+                                        className="flex-1 bg-[#3c3c3c] border border-[#555] text-zinc-200 text-[12px] px-2 py-1 rounded focus:outline-none focus:border-blue-500"
+                                    />
+                                    <button onClick={handleReplace} className="px-2 py-1 text-[10px] bg-[#3c3c3c] hover:bg-[#4c4c4c] rounded text-zinc-300">Replace</button>
+                                    <button onClick={handleReplaceAll} className="px-2 py-1 text-[10px] bg-[#3c3c3c] hover:bg-[#4c4c4c] rounded text-zinc-300">All</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Line Numbers */}
                     <div className="w-8 md:w-12 bg-[#1e1e1e] flex flex-col items-end pr-2 md:pr-3 pt-4 md:pt-5 text-[11px] md:text-[12px] font-mono text-[#858585] select-none border-r border-[#2d2d2d] shrink-0">
                         {Array.from({ length: lineCount }).map((_, i) => (
                             <div key={i} className={cn(
-                                "h-[21px] leading-[21px] w-full text-right pr-1 transition-colors",
+                                "h-[21px] leading-[21px] w-full text-right pr-1 transition-colors relative",
                                 activeLine === i + 1 ? "text-[#c6c6c6]" : ""
-                            )}>{i + 1}</div>
+                            )}>
+                                {i + 1}
+                                {/* Partner cursor indicator */}
+                                {partnerCursorLine === i + 1 && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-pink-500 animate-pulse" title="Partner's cursor" />
+                                )}
+                            </div>
                         ))}
                     </div>
 
@@ -662,7 +907,10 @@ export default function PlaygroundPage() {
                             onScroll={handleScroll}
                             onClick={updateCursorPosition}
                             onKeyUp={updateCursorPosition}
-                            className="absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-transparent caret-white leading-[21px] custom-scrollbar z-10 whitespace-pre-wrap font-mono text-[13px] md:text-[14px]"
+                            className={cn(
+                                "absolute inset-0 w-full h-full bg-transparent p-4 md:p-5 resize-none focus:outline-none text-transparent caret-white leading-[21px] custom-scrollbar z-10 font-mono text-[13px] md:text-[14px]",
+                                wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
+                            )}
                             placeholder="# Write your Python code here..."
                             spellCheck={false}
                             autoCapitalize="off"
@@ -796,6 +1044,10 @@ export default function PlaygroundPage() {
                                 {executionTime}ms
                             </span>
                         )}
+                        <button onClick={() => setWordWrap(!wordWrap)} className={cn("flex items-center gap-1 hover:bg-white/10 px-1 transition-colors", !wordWrap && "text-yellow-200")} title="Toggle Word Wrap">
+                            <WrapText className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                            <span className="hidden sm:inline">{wordWrap ? 'Wrap On' : 'Wrap Off'}</span>
+                        </button>
                         <div className="flex items-center gap-1 hover:bg-white/10 px-1">
                             <CheckCircle2 className="h-2.5 w-2.5 md:h-3 md:w-3" />
                             <span className="hidden sm:inline">Prettier</span>
@@ -803,6 +1055,11 @@ export default function PlaygroundPage() {
                     </div>
                 </footer>
             </Card>
+
+            {/* Close overlays backdrop */}
+            {(showSnippets || showHistory) && (
+                <div className="fixed inset-0 z-40" onClick={() => { setShowSnippets(false); setShowHistory(false) }} />
+            )}
         </div>
     )
 }
