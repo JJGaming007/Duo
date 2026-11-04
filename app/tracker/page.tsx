@@ -2,36 +2,17 @@
 
 import { cn } from '@/lib/utils'
 import { Check, Lock } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { useIdentity } from '@/lib/identity'
+import useSWR from 'swr'
 
 export default function TrackerPage() {
     const { currentId, isLoading: idLoading } = useIdentity()
-    const [completedDays, setCompletedDays] = useState<number[]>([])
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        const fetchProgress = async () => {
-            if (!currentId) return
-            try {
-                const res = await fetch(`/api/progress?userId=${currentId}`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setCompletedDays(data.map((d: any) => d.courseDay))
-                }
-            } catch (error) {
-                console.error(error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchProgress()
-    }, [currentId])
+    const { data, isLoading: loading } = useSWR<any[]>(currentId ? `/api/progress?userId=${currentId}` : null)
+    const completedDays: number[] = Array.isArray(data) ? data.map(d => d.courseDay) : []
 
     const days = Array.from({ length: 100 }, (_, i) => i + 1)
 
-    if (idLoading || loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
+    if (idLoading || (loading && !data)) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-500">

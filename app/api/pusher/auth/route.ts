@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { pusherServer } from '@/lib/pusher';
+import { pusherServer } from '@/lib/pusher-server';
 import { getUserName } from '@/lib/constants';
 
 export async function POST(req: Request) {

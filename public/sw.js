@@ -1,25 +1,21 @@
 // Service Worker for CodeTrack Duo PWA
 // Handles Web Push notifications, notification clicks, and offline caching
 
-const CACHE_NAME = 'codetrack-duo-v2';
+const CACHE_NAME = 'codetrack-duo-v3';
+const NAV_TIMEOUT_MS = 3000;
 const APP_SHELL_URLS = [
-    '/',
     '/dashboard',
-    '/bond',
-    '/tracker',
-    '/analytics',
-    '/log',
-    '/playground',
+    '/manifest.json',
     '/icons/icon-192x192.png',
     '/icons/icon-512x512.png',
 ];
 
-// Install — cache app shell and activate immediately
+// Install — cache a minimal app shell and activate immediately
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => cache.addAll(APP_SHELL_URLS))
-            .catch((err) => console.warn('Cache addAll failed (dev mode):', err))
+            .catch((err) => console.warn('Cache addAll failed:', err))
     );
     self.skipWaiting();
 });
@@ -102,49 +98,52 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-// Network-first fetch strategy with cache fallback for navigation requests
+function putInCache(request, response) {
+    if (!response || !response.ok || response.type === 'opaque') return;
+    const copy = response.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+}
+
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests
-    if (event.request.method !== 'GET') return;
+    const { request } = event;
+    if (request.method !== 'GET') return;
 
-    // Skip API calls and Pusher/external requests
-    const url = new URL(event.request.url);
-    if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return;
+    const url = new URL(request.url);
+    // API data is cached by the app (SWR); skip API and cross-origin requests
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-    // For navigation requests: network-first with cache fallback
-    if (event.request.mode === 'navigate') {
+    // Navigations: network-first, but never wait more than NAV_TIMEOUT_MS
+    // before falling back to the cached page (avoids long blank screens on bad networks)
+    if (request.mode === 'navigate') {
+        event.respondWith((async () => {
+            const network = fetch(request).then((res) => { putInCache(request, res); return res; });
+            const timeout = new Promise((resolve) => setTimeout(resolve, NAV_TIMEOUT_MS));
+            try {
+                const res = await Promise.race([network, timeout]);
+                if (res) return res;
+            } catch (e) { /* offline — fall through to cache */ }
+            const cached = (await caches.match(request)) || (await caches.match('/dashboard'));
+            return cached || network; // nothing cached: keep waiting for the network
+        })());
+        return;
+    }
+
+    // Hashed build assets never change: cache-first
+    if (url.pathname.startsWith('/_next/static/')) {
         event.respondWith(
-            fetch(event.request)
-                .then((response) => {
-                    // Cache the fresh response
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseToCache);
-                    });
-                    return response;
-                })
-                .catch(() => {
-                    // Offline fallback from cache
-                    return caches.match(event.request).then((cached) => {
-                        return cached || caches.match('/');
-                    });
-                })
+            caches.match(request).then((cached) =>
+                cached || fetch(request).then((res) => { putInCache(request, res); return res; })
+            )
         );
         return;
     }
 
-    // For static assets: cache-first
-    if (url.pathname.match(/\.(js|css|png|jpg|svg|ico|woff2?)$/)) {
+    // Other static files (icons, manifest, fonts): stale-while-revalidate
+    if (/\.(png|jpg|jpeg|svg|ico|webp|woff2?|json)$/.test(url.pathname)) {
         event.respondWith(
-            caches.match(event.request).then((cached) => {
-                if (cached) return cached;
-                return fetch(event.request).then((response) => {
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseToCache);
-                    });
-                    return response;
-                });
+            caches.match(request).then((cached) => {
+                const network = fetch(request).then((res) => { putInCache(request, res); return res; }).catch(() => cached);
+                return cached || network;
             })
         );
     }

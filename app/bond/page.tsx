@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Loader2, User, MessageCircle, Gamepad2, Heart, Send, Sparkles, BellRing, RotateCcw, CheckCheck, Reply, Trash2, X, SmilePlus } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
-import { pusherClient } from '@/lib/pusher'
+import { bindChannel } from '@/lib/pusher'
 import { toast } from 'react-hot-toast'
 import useSWR from 'swr'
 import { cn } from '@/lib/utils'
@@ -154,70 +154,65 @@ export default function BondPage() {
     useEffect(() => {
         if (!currentId) return
 
-        const noteChannel = pusherClient.subscribe('bond-update')
-
-        noteChannel.bind('new-note', (newNote: any) => {
-            setLiveNotes(prev => [newNote, ...prev])
-            if (newNote.senderId !== currentId) {
-                toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
-                setPartnerTyping(false)
-            }
-        })
-
-        noteChannel.bind('nudge', (data: any) => {
-            if (data.senderId !== currentId) {
-                toast(`${data.senderName} nudged you! 👋`, { icon: '🔔' })
-            }
-        })
-
-        noteChannel.bind('typing', (data: any) => {
-            if (data.senderId !== currentId) {
-                setPartnerTyping(true)
-                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-                typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
-            }
-        })
-
-        // Listen for reactions from partner
-        noteChannel.bind('reaction', (data: any) => {
-            if (data.senderId !== currentId) {
-                setReactions(prev => {
-                    const msgReactions = prev[data.messageId] || []
-                    if (msgReactions.includes(data.emoji)) return prev
-                    return { ...prev, [data.messageId]: [...msgReactions, data.emoji] }
-                })
-            }
-        })
-
-        // Listen for mood updates from partner
-        noteChannel.bind('mood', (data: any) => {
-            if (data.senderId !== currentId) {
-                setPartnerMood({ emoji: data.emoji, label: data.label })
-            }
-        })
-
-        // Listen for message deletes
-        noteChannel.bind('delete-note', (data: any) => {
-            setLiveNotes(prev => prev.filter(n => n.id !== data.messageId))
-        })
-
-        const tttChannel = pusherClient.subscribe('bond-tictactoe')
-        tttChannel.bind('game-update', (data: any) => {
-            if (data.type === 'move') {
-                setBoard(data.board)
-                setXIsNext(data.xIsNext)
-            } else if (data.type === 'reset') {
-                setBoard(Array(9).fill(null))
-                setXIsNext(true)
-                if (data.senderId !== currentId) {
-                    toast(`${getUserName(data.senderId)} restarted the game! 🎮`, { icon: '🔄' })
+        const unbindNotes = bindChannel('bond-update', {
+            'new-note': (newNote: any) => {
+                setLiveNotes(prev => prev.some(n => n.id === newNote.id) ? prev : [newNote, ...prev])
+                if (newNote.senderId !== currentId) {
+                    toast(`New note from ${newNote.senderName}! 💖`, { icon: '💌' })
+                    setPartnerTyping(false)
                 }
-            }
+            },
+            nudge: (data: any) => {
+                if (data.senderId !== currentId) {
+                    toast(`${data.senderName} nudged you! 👋`, { icon: '🔔' })
+                }
+            },
+            typing: (data: any) => {
+                if (data.senderId !== currentId) {
+                    setPartnerTyping(true)
+                    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+                    typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
+                }
+            },
+            // Reactions from partner
+            reaction: (data: any) => {
+                if (data.senderId !== currentId) {
+                    setReactions(prev => {
+                        const msgReactions = prev[data.messageId] || []
+                        if (msgReactions.includes(data.emoji)) return prev
+                        return { ...prev, [data.messageId]: [...msgReactions, data.emoji] }
+                    })
+                }
+            },
+            // Mood updates from partner
+            mood: (data: any) => {
+                if (data.senderId !== currentId) {
+                    setPartnerMood({ emoji: data.emoji, label: data.label })
+                }
+            },
+            'delete-note': (data: any) => {
+                setLiveNotes(prev => prev.filter(n => n.id !== data.messageId))
+            },
+        })
+
+        const unbindTtt = bindChannel('bond-tictactoe', {
+            'game-update': (data: any) => {
+                if (data.type === 'move') {
+                    setBoard(data.board)
+                    setXIsNext(data.xIsNext)
+                } else if (data.type === 'reset') {
+                    setBoard(Array(9).fill(null))
+                    setXIsNext(true)
+                    if (data.senderId !== currentId) {
+                        toast(`${getUserName(data.senderId)} restarted the game! 🎮`, { icon: '🔄' })
+                    }
+                }
+            },
         })
 
         return () => {
-            pusherClient.unsubscribe('bond-update')
-            pusherClient.unsubscribe('bond-tictactoe')
+            unbindNotes()
+            unbindTtt()
         }
     }, [currentId])
 

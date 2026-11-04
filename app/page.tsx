@@ -1,18 +1,6 @@
-"use client"
+import { redirect } from 'next/navigation'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-
+// "/" is also redirected in next.config.ts; this is a fallback.
 export default function RootPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.push('/dashboard')
-  }, [router])
-
-  return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
-    </div>
-  )
+    redirect('/dashboard')
 }

@@ -1,25 +1,33 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 import { DuoUser } from './constants'
 
-export function useIdentity() {
-    const [currentId, setCurrentId] = useState<DuoUser | null>(null)
+const KEY = 'codetrack-user-id'
 
-    useEffect(() => {
-        const stored = localStorage.getItem('codetrack-user-id') as DuoUser
-        if (stored) {
-            setCurrentId(stored)
-        } else {
-            // Default to user-1 if none set
-            localStorage.setItem('codetrack-user-id', 'user-1')
-            setCurrentId('user-1')
-        }
-    }, [])
+function readId(): DuoUser {
+    try {
+        const stored = localStorage.getItem(KEY) as DuoUser | null
+        if (stored === 'user-1' || stored === 'user-2') return stored
+        localStorage.setItem(KEY, 'user-1')
+    } catch { /* storage unavailable */ }
+    return 'user-1'
+}
+
+const subscribe = (cb: () => void) => {
+    window.addEventListener('storage', cb)
+    return () => window.removeEventListener('storage', cb)
+}
+
+/**
+ * Identity is read synchronously from localStorage on the client, so data
+ * fetching can start on the very first client render (no extra effect pass).
+ */
+export function useIdentity() {
+    const currentId = useSyncExternalStore<DuoUser | null>(subscribe, readId, () => null)
 
     const switchUser = (id: DuoUser) => {
-        localStorage.setItem('codetrack-user-id', id)
-        setCurrentId(id)
+        try { localStorage.setItem(KEY, id) } catch { }
         window.location.reload() // Reload to refresh all data context
     }
 

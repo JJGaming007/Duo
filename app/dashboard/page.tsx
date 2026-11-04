@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
-import { pusherClient } from '@/lib/pusher'
+import { bindChannel } from '@/lib/pusher'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
 import useSWR from 'swr'
@@ -25,21 +25,18 @@ export default function DashboardPage() {
     useEffect(() => {
         if (currentId) {
             // Real-time listener for partner progress
-            const channel = pusherClient.subscribe('partner-progress')
-            channel.bind('log-complete', (data: any) => {
-                if (data.userId !== currentId) {
-                    toast(`${data.userName || 'Partner'} just completed a day! 🚀`, {
-                        icon: '👏',
-                    })
-                    mutate()
-                }
+            return bindChannel('partner-progress', {
+                'log-complete': (data: any) => {
+                    if (data.userId !== currentId) {
+                        toast(`${data.userName || 'Partner'} just completed a day! 🚀`, {
+                            icon: '👏',
+                        })
+                        mutate()
+                    }
+                },
             })
-
-            return () => {
-                pusherClient.unsubscribe('partner-progress')
-            }
         }
-    }, [currentId])
+    }, [currentId, mutate])
 
     if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-4 border-green-600 border-t-transparent"></div></div>
 

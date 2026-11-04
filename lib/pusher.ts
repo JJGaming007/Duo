@@ -1,50 +1,44 @@
-import PusherServer from 'pusher'
 import PusherClient from 'pusher-js'
 
-export const pusherServer = new PusherServer({
-    appId: process.env.PUSHER_APP_ID!,
-    key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
-    secret: process.env.PUSHER_SECRET!,
-    cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    useTLS: true,
-})
+// Client-only Pusher instance. The server SDK lives in lib/pusher-server.ts so it
+// never gets bundled into the browser.
+//
+// IMPORTANT: pages must NOT call pusherClient.unsubscribe() on shared channels
+// ('bond-update', 'partner-progress', ...). NotificationProvider listens on those
+// globally; unsubscribing from a page silently kills app-wide notifications.
+// Use channel.unbind(event, handler) in cleanup instead.
 
-// Helper to create a Pusher client that sends the actual userId for presence auth
-function createPusherClient() {
-    const client = new PusherClient(
-        process.env.NEXT_PUBLIC_PUSHER_KEY!,
-        {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-            userAuthentication: {
-                endpoint: '/api/pusher/auth',
-                transport: 'ajax',
-            },
-            channelAuthorization: {
-                endpoint: '/api/pusher/auth',
-                transport: 'ajax',
-                params: {},
-            },
-        }
-    )
-    return client
-}
-
-export const pusherClient = createPusherClient()
-
-// Store auth params that get sent with every Pusher auth request
 let _authParams: Record<string, string> = {}
 
-/**
- * Update the user_id sent with Pusher auth requests.
- * Call this whenever the user identity is known/changed.
- */
-export function setPusherUserId(userId: string) {
-    _authParams = { user_id: userId }
-    // Re-create the channel authorization with updated params
-    const client = pusherClient as any
-    client.config.channelAuthorization = {
+export const pusherClient = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+    cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    userAuthentication: {
         endpoint: '/api/pusher/auth',
         transport: 'ajax',
-        params: _authParams,
+    },
+    channelAuthorization: {
+        endpoint: '/api/pusher/auth',
+        transport: 'ajax',
+        // Read lazily so setPusherUserId() takes effect for later subscriptions
+        paramsProvider: () => _authParams,
+    },
+})
+
+/** Update the user_id sent with Pusher auth requests (presence channels). */
+export function setPusherUserId(userId: string) {
+    _authParams = { user_id: userId }
+}
+
+type Handler = (data: any) => void
+
+/**
+ * Bind handlers on a channel and return a cleanup that only unbinds those
+ * handlers (leaving the channel subscribed for other listeners).
+ */
+export function bindChannel(channelName: string, handlers: Record<string, Handler>) {
+    const channel = pusherClient.channel(channelName) ?? pusherClient.subscribe(channelName)
+    for (const [event, fn] of Object.entries(handlers)) channel.bind(event, fn)
+    return () => {
+        for (const [event, fn] of Object.entries(handlers)) channel.unbind(event, fn)
     }
 }

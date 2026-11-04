@@ -3,16 +3,22 @@ export function registerServiceWorker() {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
 
-    window.addEventListener('load', async () => {
+    const register = async () => {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js', {
                 scope: '/',
+                updateViaCache: 'none',
             });
             console.log('SW registered:', registration.scope);
         } catch (error) {
             console.error('SW registration failed:', error);
         }
-    });
+    };
+
+    // This runs from a React effect, which is often AFTER the window 'load' event
+    // has already fired — in that case a 'load' listener would never run.
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register, { once: true });
 }
 
 export async function requestNotificationPermission() {

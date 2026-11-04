@@ -3,7 +3,15 @@ import { users } from './schema';
 import { eq } from 'drizzle-orm';
 import { PARTNER_A_NAME, PARTNER_B_NAME } from '@/lib/constants';
 
-export async function seedUsers() {
+// Only needs to succeed once per server instance
+let seeded: Promise<void> | null = null;
+
+export function seedUsers() {
+    if (!seeded) seeded = doSeed().catch((e) => { seeded = null; throw e; });
+    return seeded;
+}
+
+async function doSeed() {
     const existing = await db.select().from(users);
 
     if (existing.length < 2) {

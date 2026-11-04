@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { dailyProgress, streaks, users } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
-import { eq, desc, and, not } from "drizzle-orm";
+import { eq, asc, count } from "drizzle-orm";
 import { seedUsers } from "@/lib/db/seed";
 
 export async function GET(req: Request) {
@@ -12,18 +12,13 @@ export async function GET(req: Request) {
 
     await seedUsers();
 
-    // 1. Fetch user progress
-    const progressList = await db.select().from(dailyProgress).where(eq(dailyProgress.userId, userId));
-
-    // 2. Fetch user streak
-    const userStreakRecord = await db.query.streaks.findFirst({
-        where: eq(streaks.userId, userId)
-    });
-
-    // 3. Fetch partner stats
-    const allProgress = await db.select().from(dailyProgress);
+    const [progressList, userStreakRecord, [{ total }]] = await Promise.all([
+        db.select().from(dailyProgress).where(eq(dailyProgress.userId, userId)).orderBy(asc(dailyProgress.courseDay)),
+        db.query.streaks.findFirst({ where: eq(streaks.userId, userId) }),
+        db.select({ total: count() }).from(dailyProgress),
+    ]);
     const userCount = progressList.length;
-    const partnerCount = allProgress.length - userCount;
+    const partnerCount = Number(total) - userCount;
 
     const totalMinutes = progressList.reduce((acc, curr) => acc + (curr.timeSpentMinutes || 0), 0);
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Play, Loader2, User, Clock, Terminal, RotateCcw, Share2, Cpu, ChevronUp, ChevronDown, CheckCircle2, Copy, Search, ArrowDown, ArrowUp, Replace, X, Code2, History, WrapText } from 'lucide-react'
 import { useIdentity } from '@/lib/identity'
 import { getUserName } from '@/lib/constants'
-import { pusherClient } from '@/lib/pusher'
+import { pusherClient, bindChannel } from '@/lib/pusher'
 import { cn } from '@/lib/utils'
 import useSWR from 'swr'
 
@@ -176,8 +176,7 @@ export default function PlaygroundPage() {
         presenceChannel.bind('pusher:member_added', () => setPresenceCount(prev => prev + 1))
         presenceChannel.bind('pusher:member_removed', () => setPresenceCount(prev => Math.max(0, prev - 1)))
 
-        const channel = pusherClient.subscribe('playground')
-        channel.bind('code-update', (data: any) => {
+        const unbindCode = bindChannel('playground', { 'code-update': (data: any) => {
             if (data.senderId !== currentId) {
                 if (data.type === 'sync') {
                     ignoreNextSyncRef.current = true
@@ -194,11 +193,12 @@ export default function PlaygroundPage() {
                     setTimeout(() => setPartnerCursorLine(null), 5000)
                 }
             }
-        })
+        } })
 
         return () => {
+            // Presence channel is page-specific: leaving it is what updates the partner's count
             pusherClient.unsubscribe('presence-playground')
-            pusherClient.unsubscribe('playground')
+            unbindCode()
         }
     }, [currentId])
 

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { dailyProgress, streaks, users } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
-import { pusherServer } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 import { seedUsers } from "@/lib/db/seed";
 import { sendPushToPartner } from "@/lib/webpush";
 
@@ -88,18 +88,16 @@ export async function POST(req: Request) {
         // 4. Trigger Realtime Notification
         const { getUserName } = await import('@/lib/constants');
         const userName = getUserName(userId);
-        await pusherServer.trigger('partner-progress', 'log-complete', {
-            userId,
-            userName,
-        });
-
-        // 5. Web Push to partner (works when app is closed)
-        await sendPushToPartner(
-            userId,
-            '🚀 Partner Update',
-            `${userName} just completed Day ${courseDay}!`,
-            '/dashboard'
-        );
+        // 5. Realtime event + Web Push to partner (works when app is closed), in parallel
+        await Promise.allSettled([
+            pusherServer.trigger('partner-progress', 'log-complete', { userId, userName }),
+            sendPushToPartner(
+                userId,
+                '🚀 Partner Update',
+                `${userName} just completed Day ${courseDay}!`,
+                '/dashboard'
+            ),
+        ]);
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

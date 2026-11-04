@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { pusherServer } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 import { sendPushToPartner } from "@/lib/webpush";
 
 export async function POST(req: Request) {
@@ -44,17 +44,10 @@ export async function POST(req: Request) {
         }
 
         // Nudge: send both Pusher event and Web Push
-        await pusherServer.trigger('bond-update', 'nudge', {
-            senderId,
-            senderName
-        });
-
-        await sendPushToPartner(
-            senderId,
-            '👋 Nudge!',
-            `${senderName} nudged you!`,
-            '/bond'
-        );
+        await Promise.allSettled([
+            pusherServer.trigger('bond-update', 'nudge', { senderId, senderName }),
+            sendPushToPartner(senderId, '👋 Nudge!', `${senderName} nudged you!`, '/bond'),
+        ]);
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

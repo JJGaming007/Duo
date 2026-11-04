@@ -40,7 +40,7 @@ export function Navbar() {
                 </button>
             </header>
 
-            <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-800 bg-zinc-950/80 backdrop-blur-lg md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl shadow-black">
+            <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-800 bg-zinc-950/80 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:pb-0 md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl shadow-black">
                 <div className="mx-auto max-w-lg md:max-w-7xl md:px-6">
                     <div className="flex h-16 items-center justify-between px-6 md:px-0">
                         <div className="hidden items-center gap-2 md:flex">
@@ -58,6 +58,7 @@ export function Navbar() {
                                     <Link
                                         key={item.href}
                                         href={item.href}
+                                        prefetch
                                         className={cn(
                                             "flex flex-col items-center gap-1 transition-all duration-200 md:flex-row md:gap-2",
                                             isActive ? "text-green-500 scale-110 md:scale-100" : "text-zinc-500 hover:text-zinc-300"

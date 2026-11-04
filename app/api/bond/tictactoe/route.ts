@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { pusherServer } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 
 // This route purely relays purely ephemeral state via Pusher for instant play.
 export async function POST(req: Request) {

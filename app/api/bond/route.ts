@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { loveNotes } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
-import { pusherServer } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 import { desc, eq } from "drizzle-orm";
 import { sendPushToPartner } from "@/lib/webpush";
 
@@ -43,23 +43,23 @@ export async function POST(req: Request) {
         const { getUserName } = await import('@/lib/constants');
         const senderName = getUserName(senderId);
 
-        // 3. Realtime notification (in-app via Pusher)
-        await pusherServer.trigger('bond-update', 'new-note', {
-            id: newNote.id,
-            content: newNote.content,
-            senderId: newNote.senderId,
-            senderName,
-            createdAt: newNote.createdAt,
-            replyTo: replyTo || null,
-        });
-
-        // 4. Web Push to partner (works when app is closed)
-        await sendPushToPartner(
-            senderId,
-            `💌 ${senderName}`,
-            content.substring(0, 200),
-            '/bond'
-        );
+        // 3. Realtime (in-app via Pusher) + Web Push (app closed), in parallel
+        await Promise.allSettled([
+            pusherServer.trigger('bond-update', 'new-note', {
+                id: newNote.id,
+                content: newNote.content,
+                senderId: newNote.senderId,
+                senderName,
+                createdAt: newNote.createdAt,
+                replyTo: replyTo || null,
+            }),
+            sendPushToPartner(
+                senderId,
+                `💌 ${senderName}`,
+                content.substring(0, 200),
+                '/bond'
+            ),
+        ]);
 
         return NextResponse.json({ success: true, note: newNote });
     } catch (error: any) {

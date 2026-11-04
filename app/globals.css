@@ -23,6 +23,13 @@ html,
 body {
   overscroll-behavior: none;
   height: 100%;
+  background: #000;
+}
+
+/* Remove the 300ms tap delay / grey tap flash on mobile */
+a, button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

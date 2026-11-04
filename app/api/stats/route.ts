@@ -12,21 +12,19 @@ export async function GET(req: Request) {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch all streaks
-    const allStreaks = await db.select().from(streaks);
+    // Run all queries in parallel (each is a separate HTTP round-trip to Neon)
+    const [allStreaks, todayProgress, latestProgress] = await Promise.all([
+        db.select().from(streaks),
+        db.query.dailyProgress.findFirst({
+            where: and(eq(dailyProgress.userId, userId), eq(dailyProgress.date, today))
+        }),
+        db.query.dailyProgress.findFirst({
+            where: eq(dailyProgress.userId, userId),
+            orderBy: [desc(dailyProgress.courseDay)]
+        }),
+    ]);
     const userStreak = allStreaks.find(s => s.userId === userId)?.currentStreak || 0;
     const partnerStreak = allStreaks.find(s => s.userId !== userId)?.currentStreak || 0;
-
-    // Fetch today's progress for user
-    const todayProgress = await db.query.dailyProgress.findFirst({
-        where: and(eq(dailyProgress.userId, userId), eq(dailyProgress.date, today))
-    });
-
-    // Fetch next suggested day
-    const latestProgress = await db.query.dailyProgress.findFirst({
-        where: eq(dailyProgress.userId, userId),
-        orderBy: [desc(dailyProgress.courseDay)]
-    });
 
     return NextResponse.json({
         userStreak,
