@@ -49,4 +49,6 @@ export type DuoMember = {
     moodUpdatedAt: string | null;
     /** Profile picture URL (/api/images/<id>) */
     image: string | null;
+    /** Last time the app was open on their phone */
+    lastSeenAt: string | null;
 };

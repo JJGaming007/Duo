@@ -93,8 +93,8 @@ export async function POST(req: Request) {
             pusherServer.trigger('partner-progress', 'log-complete', { userId, userName }),
             sendPushToPartner(
                 userId,
-                '🚀 Partner Update',
-                `${userName} just completed Day ${courseDay}!`,
+                userName,
+                `Completed day ${courseDay} of 100`,
                 '/code',
                 { kind: 'progress' }
             ),

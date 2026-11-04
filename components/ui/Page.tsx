@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDuo } from '@/lib/data'
+import { useIsOnline } from '@/lib/presence'
 
 // Building blocks modelled on native grouped lists (iOS Settings / Reminders).
 
@@ -91,22 +92,44 @@ export function Row({
     return <div className={cls}>{inner}</div>
 }
 
-export function Avatar({ name, user, size = 'md' }: { name: string; user: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+export function Avatar({
+    name,
+    user,
+    size = 'md',
+    showOnline = false,
+}: {
+    name: string
+    user: string
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+    /** Green dot while this person has the app open */
+    showOnline?: boolean
+}) {
     const { data: members } = useDuo()
+    const online = useIsOnline(user)
     const src = members?.find((m) => m.id === user)?.image
-    const sizes = { sm: 'h-7 w-7 text-[12px]', md: 'h-9 w-9 text-[14px]', lg: 'h-12 w-12 text-[18px]', xl: 'h-20 w-20 text-[30px]' }
+    const sizes = { sm: 'h-7 w-7 text-[12px]', md: 'h-9 w-9 text-[14px]', lg: 'h-12 w-12 text-[18px]', xl: 'h-20 w-20 text-[30px]', '2xl': 'h-28 w-28 text-[44px]' }
     return (
-        <span
-            className={cn(
-                'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white',
-                user === 'user-1' ? 'bg-me' : 'bg-partner',
-                sizes[size],
-            )}
-        >
-            {name.charAt(0).toUpperCase()}
-            {src && (
-                // eslint-disable-next-line @next/next/no-img-element -- small, already-resized avatar
-                <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+        <span className={cn('relative inline-flex shrink-0', sizes[size])}>
+            <span
+                className={cn(
+                    'relative flex h-full w-full items-center justify-center overflow-hidden rounded-full font-semibold text-white',
+                    user === 'user-1' ? 'bg-me' : 'bg-partner',
+                )}
+            >
+                {name.charAt(0).toUpperCase()}
+                {src && (
+                    // eslint-disable-next-line @next/next/no-img-element -- small, already-resized avatar
+                    <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+                )}
+            </span>
+            {showOnline && online && (
+                <span
+                    aria-label="Online"
+                    className={cn(
+                        'absolute bottom-0 right-0 rounded-full bg-[#34c759] ring-2 ring-black',
+                        size === 'xl' || size === '2xl' ? 'h-5 w-5 ring-[3px]' : size === 'lg' ? 'h-3.5 w-3.5' : 'h-2.5 w-2.5',
+                    )}
+                />
             )}
         </span>
     )

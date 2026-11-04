@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { appMutate as mutate, patchCache } from '@/lib/swr-mutate'
-import { toast } from 'react-hot-toast'
+import { showBanner } from '@/components/Banner'
+import { startPresence } from '@/lib/presence'
 import { bindChannel, pusherClient, setPusherUserId } from '@/lib/pusher'
 import { registerServiceWorker, setAppBadge, showOsNotification, syncPushSubscription } from '@/lib/notifications'
 import { KEYS, patchMessages, unreadCount, upsertMessage, useDuo, useMe, useMessages, usePrayer, useSubjects } from '@/lib/data'
@@ -41,6 +42,8 @@ export default function RealtimeProvider() {
         if (!ready) return
         setPusherUserId(me)
         syncPushSubscription(me).then((ok) => (pushActive.current = ok))
+        // Online / last seen (joins only while the app is on screen)
+        return startPresence(me, () => mutate(KEYS.duo))
     }, [ready, me])
 
     // Unread badge on the app icon
@@ -53,32 +56,15 @@ export default function RealtimeProvider() {
         if (!ready) return
 
         const visible = () => document.visibilityState === 'visible'
-        const banner = (title: string, body: string, href: string) => {
-            toast(
-                (t) => (
-                    <button
-                        className="block w-full text-left"
-                        onClick={() => {
-                            toast.dismiss(t.id)
-                            router.push(href)
-                        }}
-                    >
-                        <span className="min-w-0">
-                            <span className="block text-[15px] font-semibold text-white">{title}</span>
-                            <span className="block max-w-[260px] truncate text-[14px] text-muted">{body}</span>
-                        </span>
-                    </button>
-                ),
-                { id: `banner-${href}`, duration: 4000 },
-            )
-        }
+        const banner = (from: string, text: string, href: string) =>
+            showBanner({ from, text, onOpen: () => router.push(href), id: `banner-${href}` })
 
         const unbindChat = bindChannel('bond-update', {
             'new-note': (msg: ChatMessage) => {
                 patchMessages((list) => upsertMessage(list, msg))
                 if (msg.senderId === me) return
                 if (visible()) {
-                    if (pathRef.current !== '/chat') banner(msg.senderName, msg.content || 'Photo', '/chat')
+                    if (pathRef.current !== '/chat') banner(msg.senderId, msg.content || 'Photo', '/chat')
                 } else if (!pushActive.current) {
                     showOsNotification(msg.senderName, msg.content.slice(0, 120) || 'Photo', 'chat', '/chat')
                 }
@@ -102,8 +88,8 @@ export default function RealtimeProvider() {
             profile: () => {
                 mutate(KEYS.duo)
             },
-            nudge: ({ senderId, senderName }: { senderId: string; senderName: string }) => {
-                if (senderId !== me && visible()) banner(senderName, 'Sent you a nudge', '/chat')
+            nudge: ({ senderId }: { senderId: string }) => {
+                if (senderId !== me && visible()) banner(senderId, 'Sent you a nudge', '/chat')
             },
         })
 
@@ -112,14 +98,14 @@ export default function RealtimeProvider() {
                 if (by === me) return
                 mutate((key) => typeof key === 'string' && key.startsWith('/api/prayer?'))
                 if (visible() && pathRef.current !== '/prayer') {
-                    banner(together ? 'Prayed together' : `${partnerName} prayed`, 'Tap to open Prayer', '/prayer')
+                    banner(by, together ? 'Logged that you prayed together' : 'Just prayed', '/prayer')
                 }
             },
             'subjects-update': ({ by, action }: { by: string; action: string }) => {
                 if (by === me) return
                 mutate(KEYS.subjects)
                 if (visible() && action === 'create' && pathRef.current !== '/prayer') {
-                    banner('New prayer subject', `Added by ${partnerName}`, '/prayer')
+                    banner(by, 'Added a prayer subject', '/prayer')
                 }
             },
         })

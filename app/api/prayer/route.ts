@@ -89,10 +89,8 @@ export async function POST(req: Request) {
             pusherServer.trigger('duo-prayer', 'prayer-update', { by: userId, date, together: !!together }),
         ];
         if (delta > 0) {
-            const body = together
-                ? `${name} logged that you prayed together 🙏`
-                : `${name} prayed ${timesLabel(myCount).toLowerCase()} today`;
-            notify.push(sendPushToPartner(userId, '🙏 Prayer', body, '/prayer', { kind: 'prayer' }));
+            const body = together ? 'Logged that you prayed together' : `Prayed ${timesLabel(myCount).toLowerCase()} today`;
+            notify.push(sendPushToPartner(userId, name, body, '/prayer', { kind: 'prayer' }));
         }
         await Promise.allSettled(notify);
 

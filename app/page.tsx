@@ -44,7 +44,7 @@ export default function TodayPage() {
                 <Group>
                     <Row
                         href="/chat"
-                        leading={<Avatar name={partnerName} user={partner} />}
+                        leading={<Avatar name={partnerName} user={partner} showOnline />}
                         title={
                             <span className="flex items-baseline justify-between gap-2">
                                 <span className="font-semibold">

@@ -10,6 +10,7 @@ export const users = pgTable('users', {
     moodEmoji: text('mood_emoji'),
     moodLabel: text('mood_label'),
     moodUpdatedAt: timestamp('mood_updated_at'),
+    lastSeenAt: timestamp('last_seen_at'),
 });
 
 // Daily progress table

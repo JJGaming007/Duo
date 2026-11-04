@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
         await Promise.allSettled([
             pusherServer.trigger('bond-update', 'new-note', { ...message, clientId }),
-            sendPushToPartner(senderId, senderName, image ? (text ? `📷 ${text.slice(0, 190)}` : '📷 Photo') : text.slice(0, 200), '/chat', { kind: 'chat' }),
+            sendPushToPartner(senderId, senderName, image ? (text ? `Photo · ${text.slice(0, 190)}` : 'Photo') : text.slice(0, 200), '/chat', { kind: 'chat' }),
         ]);
 
         // `note` is kept for older installed clients

@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
         await Promise.allSettled([
             broadcast(userId, 'create', row.id),
-            sendPushToPartner(userId, `🙏 New prayer subject`, `${getUserName(userId)}: ${t}`, '/prayer', { kind: 'subject' }),
+            sendPushToPartner(userId, getUserName(userId), `New prayer subject: ${t}`, '/prayer', { kind: 'subject' }),
         ]);
         return NextResponse.json(serialize(row));
     } catch (error) {
@@ -106,7 +106,7 @@ export async function PATCH(req: Request) {
 
         const tasks: Promise<unknown>[] = [broadcast(userId, action, id)];
         if (action === 'answer') {
-            tasks.push(sendPushToPartner(userId, '🎉 Prayer answered', `${getUserName(userId)} marked “${row.title}” as answered`, '/prayer', { kind: 'subject' }));
+            tasks.push(sendPushToPartner(userId, getUserName(userId), `Marked “${row.title}” as answered`, '/prayer', { kind: 'subject' }));
         }
         await Promise.allSettled(tasks);
         return NextResponse.json(serialize(row));

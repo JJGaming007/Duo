@@ -23,7 +23,7 @@ export default function SettingsPage() {
         if (!file) return
         setSaving(true)
         try {
-            const img = await prepareImage(file, { max: 256, square: true, quality: 0.85 })
+            const img = await prepareImage(file, { max: 512, square: true, quality: 0.85 })
             await setProfilePhoto(me, img)
             URL.revokeObjectURL(img.previewUrl)
             toast.success('Profile photo updated')
@@ -66,6 +66,7 @@ export default function SettingsPage() {
                         </button>
                         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
                     </div>
+                    <Row href={`/profile/${me}`} title="View my profile" chevron />
                     {hasPhoto && <Row onClick={removePhoto} title={<span className="text-[#ff453a]">Remove photo</span>} />}
                 </Group>
             </Section>

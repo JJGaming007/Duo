@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Check, Minus, MoreHorizontal, Plus } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Avatar, Group, Page, PageHeader, Row, Section } from '@/components/ui/Page'
@@ -39,7 +40,7 @@ function Today() {
         <Section title="Today">
             <Group>
                 <Row
-                    leading={<Avatar name={meName} user={me} size="sm" />}
+                    leading={<Link href={`/profile/${me}`} aria-label="Your profile"><Avatar name={meName} user={me} size="sm" /></Link>}
                     title="You"
                     subtitle={prayedText(mine)}
                     trailing={
@@ -55,7 +56,7 @@ function Today() {
                     }
                 />
                 <Row
-                    leading={<Avatar name={partnerName} user={partner} size="sm" />}
+                    leading={<Link href={`/profile/${partner}`} aria-label={`${partnerName}'s profile`}><Avatar name={partnerName} user={partner} size="sm" showOnline /></Link>}
                     title={partnerName}
                     subtitle={prayedText(theirs)}
                     trailing={<span className="pr-3 text-[16px] font-semibold tabular-nums text-muted">{theirs}</span>}

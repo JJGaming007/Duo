@@ -114,7 +114,7 @@ export async function showOsNotification(title: string, body: string, kind: stri
         await reg.showNotification(title, {
             body,
             icon: '/icons/icon-192x192.png',
-            badge: '/icons/icon-192x192.png',
+            badge: '/icons/badge-96.png',
             tag: `duo-${kind}`,
             data: { url, kind },
         });

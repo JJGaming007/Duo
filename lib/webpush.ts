@@ -1,6 +1,6 @@
 import webpush from 'web-push';
 import { db } from '@/lib/db';
-import { pushSubscriptions } from '@/lib/db/schema';
+import { pushSubscriptions, users } from '@/lib/db/schema';
 import { eq, ne } from 'drizzle-orm';
 
 /**
@@ -46,10 +46,11 @@ export async function sendPushToPartner(
         ensureVapidConfigured();
         if (!vapidConfigured) return { sent: 0 };
 
-        // Get all subscriptions that are NOT the sender's
-        const subscriptions = await db.select()
-            .from(pushSubscriptions)
-            .where(ne(pushSubscriptions.userId, senderId));
+        // Partner's subscriptions + the sender's profile photo (shown as the notification picture)
+        const [subscriptions, sender] = await Promise.all([
+            db.select().from(pushSubscriptions).where(ne(pushSubscriptions.userId, senderId)),
+            db.select({ image: users.image }).from(users).where(eq(users.id, senderId)).catch(() => []),
+        ]);
 
         const kind = opts.kind ?? 'chat';
         const payload = JSON.stringify({
@@ -57,6 +58,7 @@ export async function sendPushToPartner(
             body,
             url: url || '/chat',
             kind,
+            icon: sender[0]?.image || '/icons/icon-192x192.png',
             // One notification per kind: the service worker merges new ones into it
             tag: `duo-${kind}`,
         });

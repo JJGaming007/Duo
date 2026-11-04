@@ -54,6 +54,9 @@ export function initElasticScroll() {
 
     let el: HTMLElement | null = null
     let lastY = 0
+    let startX = 0
+    let startY = 0
+    let axis: 'x' | 'y' | null = null // sideways swipes (e.g. swipe-to-reply) are ignored
     let anchor: number | null = null // finger Y where the overscroll started
     let offset = 0
 
@@ -65,7 +68,9 @@ export function initElasticScroll() {
     const onStart = (e: TouchEvent) => {
         if (e.touches.length !== 1) return
         el = findScroller(e.target)
-        lastY = e.touches[0].clientY
+        lastY = startY = e.touches[0].clientY
+        startX = e.touches[0].clientX
+        axis = null
         anchor = null
         offset = 0
         if (el) el.style.transition = 'none'
@@ -74,6 +79,13 @@ export function initElasticScroll() {
     const onMove = (e: TouchEvent) => {
         if (!el || e.touches.length !== 1) return
         const y = e.touches[0].clientY
+        if (axis === null) {
+            const ax = Math.abs(e.touches[0].clientX - startX)
+            const ay = Math.abs(y - startY)
+            if (ax < 6 && ay < 6) return
+            axis = ax > ay ? 'x' : 'y'
+        }
+        if (axis === 'x') return
         const dy = y - lastY
         lastY = y
         const { fromTop, max } = position(el)

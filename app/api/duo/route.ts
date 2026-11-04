@@ -20,6 +20,7 @@ export async function GET() {
             moodLabel: u.moodLabel ?? null,
             moodUpdatedAt: u.moodUpdatedAt ? new Date(u.moodUpdatedAt).toISOString() : null,
             image: u.image ?? null,
+            lastSeenAt: u.lastSeenAt ? new Date(u.lastSeenAt).toISOString() : null,
         }));
         return NextResponse.json(members);
     } catch (error) {
@@ -35,6 +36,12 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { userId, emoji, label } = body;
         if (!isDuoUser(userId)) return badRequest('Invalid user');
+
+        // Heartbeat while the app is open (also sent via sendBeacon when it closes)
+        if (body.seen === true) {
+            await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, userId));
+            return NextResponse.json({ success: true });
+        }
 
         if ('image' in body) {
             const image = body.image;

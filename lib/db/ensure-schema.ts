@@ -36,6 +36,7 @@ const TABLES = [
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS reply_to_id uuid`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS image_id uuid`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamp`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS read_at timestamp`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS reactions jsonb DEFAULT '{}'::jsonb`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_emoji text`,

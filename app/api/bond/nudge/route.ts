@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         // Nudge: send both Pusher event and Web Push
         await Promise.allSettled([
             pusherServer.trigger('bond-update', 'nudge', { senderId, senderName }),
-            sendPushToPartner(senderId, '👋 Nudge!', `${senderName} is thinking of you`, '/chat', { kind: 'nudge' }),
+            sendPushToPartner(senderId, senderName, 'Sent you a nudge', '/chat', { kind: 'nudge' }),
         ]);
 
         return NextResponse.json({ success: true });

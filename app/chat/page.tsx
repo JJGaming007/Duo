@@ -22,7 +22,9 @@ import {
 } from '@/lib/data'
 import { dayLabel, timeLabel } from '@/lib/dates'
 import { MOOD_OPTIONS, QUICK_EMOJIS, REACTION_EMOJIS } from '@/lib/moods'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { lastSeenLabel, useIsOnline } from '@/lib/presence'
 import { useKeyboard } from '@/lib/keyboard'
 import { prepareImage, type PreparedImage } from '@/lib/images'
 import type { ChatMessage } from '@/lib/types'
@@ -127,11 +129,8 @@ export default function ChatPage() {
         }
     }
 
-    const statusText = partnerTyping
-        ? 'typing…'
-        : partnerMood?.moodEmoji
-            ? `${partnerMood.moodEmoji} ${partnerMood.moodLabel ?? ''}`
-            : ''
+    const partnerOnline = useIsOnline(partner)
+    const statusText = partnerTyping ? 'typing…' : partnerOnline ? 'online' : lastSeenLabel(partnerMood?.lastSeenAt)
 
     return (
         <div
@@ -147,6 +146,7 @@ export default function ChatPage() {
                 status={statusText}
                 typing={partnerTyping}
                 myMood={myMood?.moodEmoji ?? null}
+                partnerMoodEmoji={partnerMood?.moodEmoji ?? null}
                 onMood={(emoji, label) => setMood(me, emoji, label).catch(() => toast.error('Could not set mood'))}
                 onNudge={() => {
                     if ('vibrate' in navigator) navigator.vibrate?.(20)
@@ -192,6 +192,11 @@ export default function ChatPage() {
                                     onDoubleTap={() => !m.pending && reactToMessage(me, m.id, '❤️').catch(() => { })}
                                     onRetry={() => retryMessage(me, m).catch(() => toast.error('Still failing to send'))}
                                     onViewImage={() => setViewing(m)}
+                                    onSwipeReply={() => {
+                                        if (m.pending || m.failed) return
+                                        setReplyTo(m)
+                                        inputRef.current?.focus()
+                                    }}
                                 />
                                 {!sameDayAsOlder && (
                                     <p className="mb-1 mt-5 text-center text-[12px] font-medium text-muted">{dayLabel(m.createdAt)}</p>
@@ -301,11 +306,13 @@ function ChatHeader({
     status,
     typing,
     myMood,
+    partnerMoodEmoji,
     onMood,
     onNudge,
 }: {
     partner: string
     partnerName: string
+    partnerMoodEmoji: string | null
     status: string
     typing: boolean
     myMood: string | null
@@ -315,11 +322,17 @@ function ChatHeader({
     const [moodOpen, setMoodOpen] = useState(false)
     return (
         <header className="relative z-20 flex shrink-0 items-center gap-3 border-b border-line bg-black/90 px-4 py-2 backdrop-blur-lg md:px-6">
-            <Avatar name={partnerName} user={partner} />
-            <div className="min-w-0 flex-1">
-                <h1 className="truncate text-[17px] font-semibold leading-tight">{partnerName}</h1>
-                {status && <p className={cn('truncate text-[13px]', typing ? 'text-accent' : 'text-muted')}>{status}</p>}
-            </div>
+            {/* Tap name/photo to open their profile */}
+            <Link href={`/profile/${partner}`} className="flex min-w-0 flex-1 items-center gap-3 active:opacity-70">
+                <Avatar name={partnerName} user={partner} showOnline />
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[17px] font-semibold leading-tight">
+                        {partnerName}
+                        {partnerMoodEmoji && <span className="ml-1.5 font-normal">{partnerMoodEmoji}</span>}
+                    </span>
+                    {status && <span className={cn('block truncate text-[13px]', typing ? 'text-accent' : 'text-muted')}>{status}</span>}
+                </span>
+            </Link>
             <div className="relative">
                 <button
                     onClick={() => setMoodOpen((o) => !o)}
@@ -404,6 +417,7 @@ function Bubble({
     onDoubleTap,
     onRetry,
     onViewImage,
+    onSwipeReply,
 }: {
     m: ChatMessage
     mine: boolean
@@ -415,13 +429,16 @@ function Bubble({
     onDoubleTap: () => void
     onRetry: () => void
     onViewImage: () => void
+    onSwipeReply: () => void
 }) {
     const lastTap = useRef(0)
+    const swipe = useSwipeToReply(onSwipeReply)
     const image = m.image
     const emojiOnly = !image && !!m.content && m.content.length <= 16 && EMOJI_ONLY.test(m.content)
     const reactions = Object.entries(m.reactions ?? {})
 
     const handleClick = () => {
+        if (swipe.consumeClick()) return
         if (m.failed) return onRetry()
         const now = Date.now()
         if (now - lastTap.current < 280) {
@@ -436,8 +453,22 @@ function Bubble({
     }
 
     return (
-        <div className={cn('flex flex-col', mine ? 'items-end' : 'items-start', tight ? 'mt-0.5' : 'mt-3')}>
-            <div className={cn('max-w-[80%] md:max-w-[65%]', reactions.length && 'mb-3.5')}>
+        <div
+            className={cn('relative flex touch-pan-y flex-col', mine ? 'items-end' : 'items-start', tight ? 'mt-0.5' : 'mt-3')}
+            {...swipe.handlers}
+        >
+            {/* Reply arrow revealed while swiping right */}
+            <span
+                aria-hidden
+                className="pointer-events-none absolute left-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface-2 text-white"
+                style={{ opacity: Math.min(1, swipe.dx / 60), transform: `translateY(-50%) scale(${0.6 + Math.min(1, swipe.dx / 60) * 0.4})` }}
+            >
+                <CornerUpLeft className="h-4 w-4" />
+            </span>
+            <div
+                className={cn('max-w-[80%] md:max-w-[65%]', reactions.length && 'mb-3.5')}
+                style={{ transform: swipe.dx ? `translateX(${swipe.dx}px)` : undefined, transition: swipe.dragging ? 'none' : 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)' }}
+            >
                 <button
                     type="button"
                     onClick={handleClick}
@@ -522,6 +553,62 @@ function Bubble({
             )}
         </div>
     )
+}
+
+// WhatsApp-style: drag a message right to reply. Vertical drags scroll as usual.
+const REPLY_AT = 60
+function useSwipeToReply(onReply: () => void) {
+    const [dx, setDx] = useState(0)
+    const [dragging, setDragging] = useState(false)
+    const g = useRef<{ x: number; y: number; axis: 'x' | 'y' | null; fired: boolean } | null>(null)
+    const swiped = useRef(false)
+
+    const handlers = {
+        onTouchStart: (e: React.TouchEvent) => {
+            if (e.touches.length !== 1) return
+            g.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: null, fired: false }
+            swiped.current = false
+        },
+        onTouchMove: (e: React.TouchEvent) => {
+            const s = g.current
+            if (!s) return
+            const ddx = e.touches[0].clientX - s.x
+            const ddy = e.touches[0].clientY - s.y
+            if (s.axis === null) {
+                if (Math.abs(ddx) < 8 && Math.abs(ddy) < 8) return
+                s.axis = ddx > 0 && Math.abs(ddx) > Math.abs(ddy) * 1.2 ? 'x' : 'y'
+                if (s.axis === 'x') setDragging(true)
+            }
+            if (s.axis !== 'x') return
+            const d = Math.max(0, ddx)
+            // Follows the finger up to the threshold, then resists
+            setDx(d < REPLY_AT ? d : REPLY_AT + Math.min(40, (d - REPLY_AT) * 0.25))
+            if (d >= REPLY_AT && !s.fired) {
+                s.fired = true
+                navigator.vibrate?.(10)
+            }
+        },
+        onTouchEnd: () => {
+            const s = g.current
+            g.current = null
+            if (s?.axis === 'x') {
+                swiped.current = true
+                // Browsers often skip the click after a drag; don't let the flag linger
+                setTimeout(() => (swiped.current = false), 350)
+                if (s.fired) onReply()
+            }
+            setDragging(false)
+            setDx(0)
+        },
+    }
+    /** A swipe ends with a click event; swallow it so the action sheet doesn't open. */
+    const consumeClick = () => {
+        if (!swiped.current) return false
+        swiped.current = false
+        return true
+    }
+
+    return { dx, dragging, handlers: { ...handlers, onTouchCancel: handlers.onTouchEnd }, consumeClick }
 }
 
 function TypingBubble() {

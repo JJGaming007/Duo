@@ -1,9 +1,9 @@
 // Service Worker for Duo
 // Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'duo-v5';
+const CACHE_NAME = 'duo-v6';
 const NAV_TIMEOUT_MS = 3000;
-const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96.png'];
 const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
 
 self.addEventListener('install', (event) => {
@@ -52,24 +52,18 @@ async function handlePush(data) {
     const lines = (prev && prev.lines ? prev.lines : []).concat(body).slice(-6);
     const count = (prev && prev.count ? prev.count : 0) + 1;
 
-    let shownTitle = title;
-    let shownBody = body;
-    if (count > 1) {
-        if (kind === 'chat') {
-            shownTitle = `${title} · ${count} new messages`;
-            shownBody = lines.join('\n');
-        } else {
-            shownBody = lines.slice(-3).join('\n');
-        }
-    }
+    // Plain and quiet: the person's name as the title, their latest lines as the
+    // body. Several messages collapse into one notification ("Jibin (3)").
+    const shownTitle = count > 1 && kind === 'chat' ? `${title} (${count})` : title;
+    const shownBody = count > 1 ? lines.slice(kind === 'chat' ? -4 : -3).join('\n') : body;
 
     const options = {
         body: shownBody,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-192x192.png',
+        icon: data.icon || '/icons/icon-192x192.png', // sender's profile photo
+        badge: '/icons/badge-96.png', // monochrome status-bar icon
         tag,
         renotify: true,
-        vibrate: kind === 'chat' || kind === 'nudge' ? [120, 60, 120] : [80],
+        vibrate: kind === 'chat' || kind === 'nudge' ? [80, 40, 80] : [60],
         timestamp: Date.now(),
         data: { url, kind, lines, count },
     };
