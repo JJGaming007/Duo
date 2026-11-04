@@ -24,7 +24,15 @@ function ensureVapidConfigured() {
 /**
  * Send a push notification to all subscriptions EXCEPT the sender's.
  */
-export async function sendPushToPartner(senderId: string, title: string, body: string, url?: string) {
+export type PushKind = 'chat' | 'prayer' | 'subject' | 'nudge' | 'progress';
+
+export async function sendPushToPartner(
+    senderId: string,
+    title: string,
+    body: string,
+    url?: string,
+    opts: { kind?: PushKind } = {},
+) {
     try {
         ensureVapidConfigured();
         if (!vapidConfigured) return { sent: 0 };
@@ -34,11 +42,14 @@ export async function sendPushToPartner(senderId: string, title: string, body: s
             .from(pushSubscriptions)
             .where(ne(pushSubscriptions.userId, senderId));
 
+        const kind = opts.kind ?? 'chat';
         const payload = JSON.stringify({
             title,
             body,
-            url: url || '/bond',
-            tag: `${title}-${Date.now()}`,
+            url: url || '/chat',
+            kind,
+            // One notification per kind: the service worker merges new ones into it
+            tag: `duo-${kind}`,
         });
 
         const results = await Promise.allSettled(
@@ -52,7 +63,8 @@ export async function sendPushToPartner(senderId: string, title: string, body: s
                                 auth: sub.auth,
                             },
                         },
-                        payload
+                        payload,
+                        { TTL: 60 * 60 * 24, urgency: kind === 'chat' || kind === 'nudge' ? 'high' : 'normal' }
                     );
                 } catch (error: any) {
                     // If subscription is expired/invalid (410 Gone or 404), remove it

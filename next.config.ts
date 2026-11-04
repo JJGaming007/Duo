@@ -5,9 +5,16 @@ import type { NextConfig } from "next";
 // own public/sw.js at build time and overwrites ours.
 const nextConfig: NextConfig = {
   turbopack: {},
+  env: {
+    // Shown in More → version, so you can tell which build a phone is running
+    NEXT_PUBLIC_BUILD_ID: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7) || "dev",
+  },
   async redirects() {
-    // Server-side redirect: no JS round-trip / spinner when opening "/"
-    return [{ source: "/", destination: "/dashboard", permanent: false }];
+    // Old routes (installed apps may still open these)
+    return [
+      { source: "/dashboard", destination: "/", permanent: false },
+      { source: "/bond", destination: "/chat", permanent: false },
+    ];
   },
   async headers() {
     return [

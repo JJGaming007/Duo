@@ -14,7 +14,7 @@ import useSWR from 'swr'
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-export default function DashboardPage() {
+export default function CodeOverviewPage() {
     const router = useRouter()
     const { currentId, isLoading } = useIdentity()
 
@@ -51,7 +51,7 @@ export default function DashboardPage() {
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <header className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight text-white">Dashboard</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Coding</h1>
                 <div className="flex items-center gap-2">
                     <span className="text-zinc-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                     <span className="px-2 py-0.5 rounded-full bg-green-900/20 border border-green-900/50 text-green-500 text-[10px] uppercase font-bold tracking-wider">

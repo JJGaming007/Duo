@@ -1,16 +1,11 @@
-// Service Worker for CodeTrack Duo PWA
-// Handles Web Push notifications, notification clicks, and offline caching
+// Service Worker for Duo
+// Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'codetrack-duo-v3';
+const CACHE_NAME = 'duo-v4';
 const NAV_TIMEOUT_MS = 3000;
-const APP_SHELL_URLS = [
-    '/dashboard',
-    '/manifest.json',
-    '/icons/icon-192x192.png',
-    '/icons/icon-512x512.png',
-];
+const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
 
-// Install — cache a minimal app shell and activate immediately
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -20,83 +15,99 @@ self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// Activate — clean old caches, claim clients immediately
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((keyList) => {
-            return Promise.all(
-                keyList
-                    .filter((key) => key !== CACHE_NAME)
-                    .map((key) => caches.delete(key))
-            );
-        }).then(() => clients.claim())
+        caches.keys()
+            .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+            .then(() => self.clients.claim())
     );
 });
 
-// Handle incoming push notifications (works even when app is closed!)
+// ------------------------------------------------------------------ Push
+
 self.addEventListener('push', (event) => {
     let data = {};
     try {
         data = event.data ? event.data.json() : {};
     } catch (e) {
-        data = { title: 'CodeTrack Duo', body: event.data ? event.data.text() : 'New notification' };
+        data = { title: 'Duo', body: event.data ? event.data.text() : 'New notification' };
+    }
+    event.waitUntil(handlePush(data));
+});
+
+async function handlePush(data) {
+    const kind = data.kind || 'chat';
+    const tag = data.tag || `duo-${kind}`;
+    const url = data.url || '/';
+    const title = data.title || 'Duo';
+    const body = data.body || '';
+
+    // If the app is open on screen, it already shows an in-app banner.
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const appVisible = windows.some((c) => c.visibilityState === 'visible');
+
+    // Merge with an existing notification of the same kind: "3 new messages"
+    const existing = await self.registration.getNotifications({ tag });
+    const prev = existing[0] && existing[0].data ? existing[0].data : null;
+    const lines = (prev && prev.lines ? prev.lines : []).concat(body).slice(-6);
+    const count = (prev && prev.count ? prev.count : 0) + 1;
+
+    let shownTitle = title;
+    let shownBody = body;
+    if (count > 1) {
+        if (kind === 'chat') {
+            shownTitle = `${title} · ${count} new messages`;
+            shownBody = lines.join('\n');
+        } else {
+            shownBody = lines.slice(-3).join('\n');
+        }
     }
 
-    const title = data.title || 'CodeTrack Duo';
     const options = {
-        body: data.body || 'You have a new notification',
+        body: shownBody,
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-192x192.png',
-        vibrate: [200, 100, 200],
-        tag: data.tag || 'codetrack-' + Date.now(),
+        tag,
         renotify: true,
-        requireInteraction: false,
-        actions: [
-            { action: 'open', title: 'Open' },
-        ],
-        data: {
-            url: data.url || '/bond',
-        },
+        vibrate: kind === 'chat' || kind === 'nudge' ? [120, 60, 120] : [80],
+        timestamp: Date.now(),
+        data: { url, kind, lines, count },
     };
 
-    // Check if any visible client (tab) is already focused — skip notification if so
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            const isAppFocused = clientList.some(
-                (client) => client.url.includes(self.location.origin) && client.visibilityState === 'visible'
-            );
-            // If app is focused, the Pusher handler already shows in-app notifications
-            if (isAppFocused) return;
-            return self.registration.showNotification(title, options);
-        })
-    );
-});
-
-// Handle notification click — open/focus the app
-self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
-
-    const urlToOpen = event.notification.data?.url || '/bond';
-
-    // Handle action buttons
-    if (event.action === 'open') {
-        // Default open behavior below
+    if (appVisible) {
+        // Safari revokes push permission if a push doesn't show a notification,
+        // so on Apple devices show it and close it straight away.
+        if (IS_APPLE) {
+            await self.registration.showNotification(shownTitle, { ...options, silent: true });
+            const shown = await self.registration.getNotifications({ tag });
+            shown.forEach((n) => n.close());
+        }
+        return;
     }
 
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // If the app is already open, focus it and navigate
-            for (const client of clientList) {
-                if (client.url.includes(self.location.origin) && 'focus' in client) {
-                    client.navigate(urlToOpen);
-                    return client.focus();
+    await self.registration.showNotification(shownTitle, options);
+}
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const urlToOpen = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+
+    event.waitUntil((async () => {
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of windows) {
+            if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+                await client.focus();
+                if (client.url !== urlToOpen && 'navigate' in client) {
+                    try { await client.navigate(urlToOpen); } catch (e) { /* uncontrolled client */ }
                 }
+                return;
             }
-            // Otherwise open a new window
-            return clients.openWindow(urlToOpen);
-        })
-    );
+        }
+        await self.clients.openWindow(urlToOpen);
+    })());
 });
+
+// ------------------------------------------------------------------ Caching
 
 function putInCache(request, response) {
     if (!response || !response.ok || response.type === 'opaque') return;
@@ -113,7 +124,6 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
     // Navigations: network-first, but never wait more than NAV_TIMEOUT_MS
-    // before falling back to the cached page (avoids long blank screens on bad networks)
     if (request.mode === 'navigate') {
         event.respondWith((async () => {
             const network = fetch(request).then((res) => { putInCache(request, res); return res; });
@@ -122,8 +132,8 @@ self.addEventListener('fetch', (event) => {
                 const res = await Promise.race([network, timeout]);
                 if (res) return res;
             } catch (e) { /* offline — fall through to cache */ }
-            const cached = (await caches.match(request)) || (await caches.match('/dashboard'));
-            return cached || network; // nothing cached: keep waiting for the network
+            const cached = (await caches.match(request)) || (await caches.match('/'));
+            return cached || network;
         })());
         return;
     }

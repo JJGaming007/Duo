@@ -1,24 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import ToastProvider from "@/components/providers/ToastProvider";
-import NotificationProvider from "@/components/providers/NotificationProvider";
-import { Navbar } from "@/components/layout/Navbar";
+import RealtimeProvider from "@/components/providers/RealtimeProvider";
 import SWRProvider from "@/components/providers/SWRProvider";
-
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+import { Navbar } from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
-  title: "CodeTrack Duo",
-  description: "Track your 100 Days of Code journey with your partner.",
+  title: "Duo",
+  description: "Pray, talk and grow together.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "CodeTrack Duo",
+    statusBarStyle: "black",
+    title: "Duo",
   },
   icons: {
-    apple: "/icons/apple-touch-icon.png"
+    apple: "/icons/apple-touch-icon.png",
   },
   formatDetection: {
     telephone: false,
@@ -41,15 +38,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark bg-black">
-      <body className={`${inter.className} bg-black text-zinc-100 antialiased h-[100dvh] pt-14 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 md:pt-16 overflow-hidden flex flex-col`}>
-        <Navbar />
+      <body
+        className={`flex h-[100dvh] flex-col overflow-hidden bg-black font-sans pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white antialiased md:pb-0 md:pt-14`}
+      >
         <SWRProvider>
-          <main className="mx-auto max-w-7xl flex-1 overflow-y-auto overflow-x-hidden overscroll-contain w-full">
-            {children}
-          </main>
+          <Navbar />
+          <main className="w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">{children}</main>
+          <RealtimeProvider />
         </SWRProvider>
         <ToastProvider />
-        <NotificationProvider />
       </body>
     </html>
   );

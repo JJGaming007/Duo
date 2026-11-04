@@ -1,6 +1,5 @@
 import { db } from './index';
 import { users } from './schema';
-import { eq } from 'drizzle-orm';
 import { PARTNER_A_NAME, PARTNER_B_NAME } from '@/lib/constants';
 
 // Only needs to succeed once per server instance

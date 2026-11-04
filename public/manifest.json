@@ -1,16 +1,29 @@
 {
-  "name": "CodeTrack Duo",
-  "short_name": "CodeTrack",
-  "description": "Track your 100 Days of Code journey with your partner.",
-  "start_url": "/dashboard",
+  "id": "/",
+  "name": "Duo",
+  "short_name": "Duo",
+  "description": "Pray, talk and grow together.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
   "categories": [
-    "education",
-    "productivity"
+    "lifestyle",
+    "social"
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat",
+      "url": "/chat",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Prayer",
+      "url": "/prayer",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
   ],
   "icons": [
     {

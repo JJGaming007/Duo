@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, date, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, date, uuid, uniqueIndex, jsonb, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Simple Users table for hardcoded Duo
@@ -7,6 +7,9 @@ export const users = pgTable('users', {
     name: text('name').notNull(),
     image: text('image'),
     xp: integer('xp').default(0),
+    moodEmoji: text('mood_emoji'),
+    moodLabel: text('mood_label'),
+    moodUpdatedAt: timestamp('mood_updated_at'),
 });
 
 // Daily progress table
@@ -39,6 +42,37 @@ export const loveNotes = pgTable('love_notes', {
     id: uuid('id').defaultRandom().primaryKey(),
     senderId: text('sender_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
     content: text('content').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    replyToId: uuid('reply_to_id'),
+    readAt: timestamp('read_at'),
+    // { [userId]: emoji } — one reaction per person per message
+    reactions: jsonb('reactions').$type<Record<string, string>>().default({}),
+}, (table) => ({
+    createdAtIdx: index('love_notes_created_at_idx').on(table.createdAt),
+}));
+
+// How many times each person prayed on a given (local) day
+export const prayerLogs = pgTable('prayer_logs', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    date: date('date').notNull(),
+    count: integer('count').notNull().default(0),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    userDateUnique: uniqueIndex('prayer_logs_user_date_unique').on(table.userId, table.date),
+}));
+
+// Shared prayer subjects (a to-do list of things to pray for)
+export const prayerSubjects = pgTable('prayer_subjects', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    title: text('title').notNull(),
+    notes: text('notes'),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    // 'both' | 'user-1' | 'user-2'
+    forWhom: text('for_whom').notNull().default('both'),
+    prayedCount: integer('prayed_count').notNull().default(0),
+    lastPrayedAt: timestamp('last_prayed_at'),
+    answeredAt: timestamp('answered_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

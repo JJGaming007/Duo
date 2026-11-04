@@ -50,7 +50,7 @@ export default function LogPage() {
             if (!res.ok) throw new Error('Failed to save progress')
 
             toast.success('Progress logged! 🔥')
-            router.push('/dashboard')
+            router.push('/code')
         } catch (error: any) {
             toast.error(error.message)
         } finally {

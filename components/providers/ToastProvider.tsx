@@ -5,17 +5,19 @@ import { Toaster } from 'react-hot-toast'
 export default function ToastProvider() {
     return (
         <Toaster
-            position="bottom-center"
+            position="top-center"
             toastOptions={{
                 style: {
-                    background: '#18181b', // zinc-900
-                    color: '#f4f4f5', // zinc-100
-                    border: '1px solid #27272a', // zinc-800
+                    background: '#232326',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '15px',
+                    boxShadow: '0 8px 30px rgba(0,0,0,.5)',
                     borderRadius: '12px',
                 },
                 success: {
                     iconTheme: {
-                        primary: '#16a34a', // green-600
+                        primary: '#e8735a',
                         secondary: '#fff',
                     },
                 },

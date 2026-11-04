@@ -95,7 +95,8 @@ export async function POST(req: Request) {
                 userId,
                 '🚀 Partner Update',
                 `${userName} just completed Day ${courseDay}!`,
-                '/dashboard'
+                '/code',
+                { kind: 'progress' }
             ),
         ]);
 

@@ -2,88 +2,54 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Grid3X3, PlusCircle, BarChart3, Heart, RefreshCw, Terminal } from 'lucide-react'
+import { Home, BookHeart, MessageCircle, Code2, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useIdentity } from '@/lib/identity'
-import { getUserName } from '@/lib/constants'
+import { useCodingMode } from '@/lib/prefs'
+import { unreadCount, useMe, useMessages } from '@/lib/data'
 
-const navItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Tracker', href: '/tracker', icon: Grid3X3 },
-    { name: 'Log', href: '/log', icon: PlusCircle },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Connect', href: '/bond', icon: Heart },
-    { name: 'Playground', href: '/playground', icon: Terminal },
-]
+export const CODE_ROUTES = ['/code', '/tracker', '/log', '/analytics', '/playground']
 
 export function Navbar() {
     const pathname = usePathname()
-    const { currentId, switchUser } = useIdentity()
+    const [coding] = useCodingMode()
+    const { me } = useMe()
+    const { data: messages } = useMessages()
+    const unread = unreadCount(messages, me)
+
+    const items = [
+        { name: 'Today', href: '/', icon: Home, active: pathname === '/' },
+        { name: 'Prayer', href: '/prayer', icon: BookHeart, active: pathname.startsWith('/prayer') },
+        { name: 'Chat', href: '/chat', icon: MessageCircle, active: pathname.startsWith('/chat'), badge: unread },
+        ...(coding ? [{ name: 'Coding', href: '/code', icon: Code2, active: CODE_ROUTES.some((r) => pathname.startsWith(r)) }] : []),
+        { name: 'Settings', href: '/more', icon: Settings, active: pathname.startsWith('/more') || pathname.startsWith('/games') },
+    ]
 
     return (
-        <>
-            {/* Mobile Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-4 backdrop-blur-lg md:hidden shadow-lg shadow-black">
-                <div className="flex items-center gap-2">
-                    <div className="flex px-2 h-7 items-center justify-center rounded-lg bg-green-600 text-[10px] font-bold text-white shadow-lg shadow-green-900/20">
-                        DUO
-                    </div>
-                    <span className="text-sm font-bold tracking-tight text-white">CodeTrack Duo</span>
-                </div>
-                <button
-                    onClick={() => switchUser(currentId === 'user-1' ? 'user-2' : 'user-1')}
-                    className="flex h-8 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-[10px] font-bold text-zinc-400 transition-all hover:border-green-900/50 hover:text-green-400"
-                    title="Switch User"
-                >
-                    <RefreshCw className="h-3 w-3" />
-                    <span>{getUserName(currentId || 'user-1')}</span>
-                </button>
-            </header>
-
-            <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-800 bg-zinc-950/80 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:pb-0 md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl shadow-black">
-                <div className="mx-auto max-w-lg md:max-w-7xl md:px-6">
-                    <div className="flex h-16 items-center justify-between px-6 md:px-0">
-                        <div className="hidden items-center gap-2 md:flex">
-                            <div className="px-3 h-8 rounded-lg bg-green-600 flex items-center justify-center font-bold text-white shadow-lg shadow-green-900/20 italic">
-                                DUO
-                            </div>
-                            <span className="text-lg font-bold tracking-tight text-white">CodeTrack Duo</span>
-                        </div>
-
-                        <div className="flex w-full items-center justify-around md:w-auto md:gap-8">
-                            {navItems.map((item) => {
-                                const Icon = item.icon
-                                const isActive = pathname === item.href
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        prefetch
-                                        className={cn(
-                                            "flex flex-col items-center gap-1 transition-all duration-200 md:flex-row md:gap-2",
-                                            isActive ? "text-green-500 scale-110 md:scale-100" : "text-zinc-500 hover:text-zinc-300"
-                                        )}
-                                    >
-                                        <Icon className={cn("h-6 w-6", isActive && "drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]")} />
-                                        <span className="text-[10px] font-medium md:text-sm">{item.name}</span>
-                                    </Link>
-                                )
-                            })}
-                        </div>
-
-                        <div className="hidden md:flex items-center gap-3">
-                            <button
-                                onClick={() => switchUser(currentId === 'user-1' ? 'user-2' : 'user-1')}
-                                className="flex items-center gap-2 h-9 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-green-400 hover:border-green-900/50 transition-all text-xs font-bold"
-                                title="Switch User"
-                            >
-                                <RefreshCw className="h-3 w-3" />
-                                <span>{getUserName(currentId || 'user-1')}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-        </>
+        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:bottom-auto md:top-0 md:border-b md:border-t-0 md:pb-0">
+            <div className="mx-auto flex h-16 max-w-xl items-stretch md:h-14 md:max-w-3xl md:items-center md:gap-6 md:px-4">
+                <span className="hidden text-[17px] font-semibold md:block">Duo</span>
+                {items.map(({ name, href, icon: Icon, active, badge }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        prefetch
+                        className={cn(
+                            'flex flex-1 flex-col items-center justify-center gap-[3px] pt-1 md:flex-none md:flex-row md:gap-1.5 md:pt-0',
+                            active ? 'text-accent' : 'text-muted hover:text-white',
+                        )}
+                    >
+                        <span className="relative">
+                            <Icon className="h-6 w-6 md:h-[18px] md:w-[18px]" strokeWidth={active ? 2.2 : 1.8} />
+                            {!!badge && (
+                                <span className="absolute -right-2.5 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#ff3b30] px-[5px] text-[11px] font-semibold leading-none text-white">
+                                    {badge > 99 ? '99+' : badge}
+                                </span>
+                            )}
+                        </span>
+                        <span className="text-[10.5px] font-medium md:text-[14px]">{name}</span>
+                    </Link>
+                ))}
+            </div>
+        </nav>
     )
 }

@@ -29,6 +29,7 @@ export function setPusherUserId(userId: string) {
     _authParams = { user_id: userId }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- handlers declare their own payload types
 type Handler = (data: any) => void
 
 /**
