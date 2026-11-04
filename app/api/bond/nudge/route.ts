@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { pusherServer } from "@/lib/pusher-server";
 import { sendPushToPartner } from "@/lib/webpush";
 
@@ -45,10 +45,9 @@ export async function POST(req: Request) {
         }
 
         // Nudge: send both Pusher event and Web Push
-        await Promise.allSettled([
-            pusherServer.trigger('bond-update', 'nudge', { senderId, senderName }),
-            sendPushToPartner(senderId, senderName, 'Sent you a nudge', '/chat', { kind: 'nudge' }),
-        ]);
+        await pusherServer.trigger('bond-update', 'nudge', { senderId, senderName }).catch(() => {});
+        // Push after responding: the sender shouldn't wait for delivery
+        after(() => sendPushToPartner(senderId, senderName, 'Sent you a nudge', '/chat', { kind: 'nudge' }));
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

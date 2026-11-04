@@ -4,20 +4,10 @@ import { db } from '@/lib/db';
 import { images, loveNotes } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
-import { sendPushToPartner } from '@/lib/webpush';
-import { getUserName } from '@/lib/constants';
-import { serializeMessages } from '@/lib/server/messages';
+import { createMessage, MAX_MESSAGE_LENGTH, serializeMessages, uuidOrNull } from '@/lib/server/messages';
 import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
 
-const MAX_LENGTH = 2000;
 const EDIT_WINDOW_MS = 15 * 60 * 1000; // same as WhatsApp
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const uuidOrNull = (v: unknown) => (typeof v === 'string' && UUID.test(v) ? v : null);
-
-const formatDuration = (ms: number) => {
-    const s = Math.max(1, Math.round(ms / 1000));
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
 
 // GET /api/messages?before=<iso>&limit=50 — newest first
 export async function GET(req: Request) {
@@ -41,36 +31,18 @@ export async function GET(req: Request) {
 }
 
 // POST { senderId, content?, imageId?, audioId?, replyToId?, clientId? }
+// (Photos and voice messages normally go through POST /api/images with the
+// message fields, which uploads and creates the message in one request.)
 export async function POST(req: Request) {
     try {
         await ensureSchema();
         const { senderId, content, replyToId, clientId, imageId, audioId } = await req.json();
         if (!isDuoUser(senderId)) return badRequest('Invalid sender');
-        const text = typeof content === 'string' ? content.trim().slice(0, MAX_LENGTH) : '';
-        const image = uuidOrNull(imageId);
-        const audio = uuidOrNull(audioId);
-        if (!text && !image && !audio) return badRequest('Message is empty');
-
-        const [row] = await db
-            .insert(loveNotes)
-            .values({ senderId, content: text, imageId: image, audioId: audio, replyToId: uuidOrNull(replyToId) })
-            .returning();
-
-        const [message] = await serializeMessages([row]);
-        const senderName = getUserName(senderId);
-        const pushBody = audio
-            ? `Voice message (${formatDuration(message.audio?.durationMs ?? 0)})`
-            : image
-                ? text ? `Photo · ${text.slice(0, 190)}` : 'Photo'
-                : text.slice(0, 200);
-
-        await Promise.allSettled([
-            pusherServer.trigger('bond-update', 'new-note', { ...message, clientId }),
-            sendPushToPartner(senderId, senderName, pushBody, '/chat', { kind: 'chat' }),
-        ]);
+        const message = await createMessage({ senderId, content, replyToId, clientId, imageId: uuidOrNull(imageId), audioId: uuidOrNull(audioId) });
+        if (!message) return badRequest('Message is empty');
 
         // `note` is kept for older installed clients
-        return NextResponse.json({ success: true, message: { ...message, clientId }, note: message });
+        return NextResponse.json({ success: true, message, note: message });
     } catch (error) {
         return serverError(error);
     }
@@ -82,7 +54,7 @@ export async function PATCH(req: Request) {
         await ensureSchema();
         const { messageId, senderId, content } = await req.json();
         if (!uuidOrNull(messageId) || !isDuoUser(senderId)) return badRequest('Message ID and sender ID required');
-        const text = typeof content === 'string' ? content.trim().slice(0, MAX_LENGTH) : '';
+        const text = typeof content === 'string' ? content.trim().slice(0, MAX_MESSAGE_LENGTH) : '';
         if (!text) return badRequest('Message is empty');
 
         const row = await db.query.loveNotes.findFirst({ where: eq(loveNotes.id, messageId) });

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { and, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { prayerLogs } from '@/lib/db/schema';
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         ];
         if (delta > 0) {
             const body = together ? 'Logged that you prayed together' : `Prayed ${timesLabel(myCount).toLowerCase()} today`;
-            notify.push(sendPushToPartner(userId, name, body, '/prayer', { kind: 'prayer' }));
+            after(() => sendPushToPartner(userId, name, body, '/prayer', { kind: 'prayer' }));
         }
         await Promise.allSettled(notify);
 

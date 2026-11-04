@@ -1,4 +1,7 @@
 import { inArray } from 'drizzle-orm';
+import { after } from 'next/server';
+import { pusherServer } from '@/lib/pusher-server';
+import { sendPushToPartner } from '@/lib/webpush';
 import { db } from '@/lib/db';
 import { images, loveNotes } from '@/lib/db/schema';
 import { getUserName } from '@/lib/constants';
@@ -66,4 +69,51 @@ export async function serializeMessages(rows: Row[]): Promise<ChatMessage[]> {
             audio: !deleted && r.audioId ? audioMeta.get(r.audioId) ?? { id: r.audioId, url: `/api/images/${r.audioId}`, durationMs: 0, waveform: [] } : null,
         };
     });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const uuidOrNull = (v: unknown) => (typeof v === 'string' && UUID.test(v) ? v : null);
+export const MAX_MESSAGE_LENGTH = 2000;
+
+const formatDuration = (ms: number) => {
+    const s = Math.max(1, Math.round(ms / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/**
+ * Create a chat message, broadcast it live, and send the push notification
+ * AFTER the response (so the sender isn't kept waiting for push delivery).
+ */
+export async function createMessage(input: {
+    senderId: string;
+    content?: unknown;
+    imageId?: string | null;
+    audioId?: string | null;
+    replyToId?: unknown;
+    clientId?: unknown;
+}) {
+    const text = typeof input.content === 'string' ? input.content.trim().slice(0, MAX_MESSAGE_LENGTH) : '';
+    const imageId = input.imageId ?? null;
+    const audioId = input.audioId ?? null;
+    if (!text && !imageId && !audioId) return null;
+
+    const [row] = await db
+        .insert(loveNotes)
+        .values({ senderId: input.senderId, content: text, imageId, audioId, replyToId: uuidOrNull(input.replyToId) })
+        .returning();
+    const [message] = await serializeMessages([row]);
+    const clientId = typeof input.clientId === 'string' ? input.clientId.slice(0, 64) : undefined;
+
+    // Live update for the partner's open app (fast), awaited so ordering is kept
+    await pusherServer.trigger('bond-update', 'new-note', { ...message, clientId }).catch((e) => console.error(e));
+
+    const senderName = getUserName(input.senderId);
+    const body = audioId
+        ? `Voice message (${formatDuration(message.audio?.durationMs ?? 0)})`
+        : imageId
+            ? text ? `Photo · ${text.slice(0, 190)}` : 'Photo'
+            : text.slice(0, 200);
+    after(() => sendPushToPartner(input.senderId, senderName, body, '/chat', { kind: 'chat' }));
+
+    return { ...message, clientId };
 }

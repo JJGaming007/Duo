@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { prayerSubjects } from '@/lib/db/schema';
@@ -63,10 +63,8 @@ export async function POST(req: Request) {
             })
             .returning();
 
-        await Promise.allSettled([
-            broadcast(userId, 'create', row.id),
-            sendPushToPartner(userId, getUserName(userId), `New prayer subject: ${t}`, '/prayer', { kind: 'subject' }),
-        ]);
+        await broadcast(userId, 'create', row.id).catch(() => {});
+        after(() => sendPushToPartner(userId, getUserName(userId), `New prayer subject: ${t}`, '/prayer', { kind: 'subject' }));
         return NextResponse.json(serialize(row));
     } catch (error) {
         return serverError(error);
@@ -106,7 +104,7 @@ export async function PATCH(req: Request) {
 
         const tasks: Promise<unknown>[] = [broadcast(userId, action, id)];
         if (action === 'answer') {
-            tasks.push(sendPushToPartner(userId, getUserName(userId), `Marked “${row.title}” as answered`, '/prayer', { kind: 'subject' }));
+            after(() => sendPushToPartner(userId, getUserName(userId), `Marked “${row.title}” as answered`, '/prayer', { kind: 'subject' }));
         }
         await Promise.allSettled(tasks);
         return NextResponse.json(serialize(row));

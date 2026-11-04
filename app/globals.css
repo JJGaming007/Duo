@@ -34,10 +34,13 @@ body {
   }
 }
 
-/* Android: lib/elastic.ts draws an iOS-style bounce, so turn off the native
-   stretch/glow to avoid both at once. */
-html.elastic-scroll * {
-  overscroll-behavior-y: none;
+/* Scroll containers keep the platform's own overscroll effect (iOS rubber-band,
+   Android stretch) but don't chain scrolling to the page behind them.
+   Don't replace this with JS touch handling: a non-passive touchmove listener
+   that cancels the first move of a gesture stops Android from scrolling at all. */
+main,
+.overscroll-contain {
+  overscroll-behavior-y: contain;
 }
 
 /* Remove the 300ms tap delay / grey tap flash on mobile */

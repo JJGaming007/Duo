@@ -11,7 +11,7 @@ import { getUserName, type DuoUser } from './constants'
 import { todayKey } from './dates'
 import type { ChatMessage, DuoMember, PrayerSubject, PrayerSummary } from './types'
 import { uploadImage, type PreparedImage } from './images'
-import { uploadVoice, type RecordedVoice } from './voice'
+import type { RecordedVoice } from './voice'
 
 export const KEYS = {
     messages: '/api/messages',
@@ -114,18 +114,16 @@ export async function sendMessage(
     }
     patchMessages((list) => upsertMessage(list, optimistic))
     try {
-        const [uploadedImage, uploadedVoice] = await Promise.all([
-            image ? uploadImage(me, image) : null,
-            voice ? uploadVoice(me, voice) : null,
-        ])
-        const { message } = await send<{ message: ChatMessage }>('/api/messages', 'POST', {
-            senderId: me,
-            content,
-            replyToId: replyTo?.id,
-            imageId: uploadedImage?.id,
-            audioId: uploadedVoice?.id,
-            clientId,
-        })
+        // Photo / voice: upload the file and create the message in ONE request
+        const { message } =
+            image || voice
+                ? await sendWithMedia(me, { content, replyToId: replyTo?.id, clientId }, image, voice)
+                : await send<{ message: ChatMessage }>('/api/messages', 'POST', {
+                    senderId: me,
+                    content,
+                    replyToId: replyTo?.id,
+                    clientId,
+                })
         // Swap the local preview for the uploaded URL once that has loaded (no flicker).
         // The cache is persisted, so a blob: URL must never stay in it.
         if (message.image) await preload(message.image.url)
@@ -135,6 +133,33 @@ export async function sendMessage(
         patchMessages((list) => list.map((m) => (m.clientId === clientId ? { ...m, pending: false, failed: true } : m)))
         throw e
     }
+}
+
+async function sendWithMedia(
+    me: DuoUser,
+    fields: { content: string; replyToId?: string; clientId: string },
+    image?: PreparedImage,
+    voice?: RecordedVoice,
+): Promise<{ message: ChatMessage }> {
+    const form = new FormData()
+    form.append('senderId', me)
+    form.append('content', fields.content)
+    form.append('clientId', fields.clientId)
+    if (fields.replyToId) form.append('replyToId', fields.replyToId)
+    if (voice) {
+        form.append('file', voice.blob, `voice.${voice.mime.includes('mp4') ? 'm4a' : 'webm'}`)
+        form.append('duration', String(Math.round(voice.durationMs)))
+        form.append('wave', voice.waveform.join(','))
+    } else if (image) {
+        form.append('file', image.blob, 'photo.jpg')
+        form.append('w', String(image.width))
+        form.append('h', String(image.height))
+    }
+    const res = await fetch('/api/images', { method: 'POST', body: form })
+    if (!res.ok) throw new Error(res.status === 413 ? 'That file is too large' : 'Couldn’t send — check your connection')
+    const data = (await res.json()) as { message: ChatMessage | null }
+    if (!data.message) throw new Error('Couldn’t send')
+    return { message: data.message }
 }
 
 /** What a reply bubble shows about the message it quotes */

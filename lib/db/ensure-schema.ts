@@ -54,6 +54,26 @@ const INDEXES = [
     `CREATE INDEX IF NOT EXISTS love_notes_created_at_idx ON love_notes (created_at)`,
 ];
 
+// Newest columns added above. If they all exist, every earlier statement has
+// run too, so a warm database costs one query instead of ~20 sequential DDL
+// round-trips on each cold start.
+const LATEST = [
+    ['love_notes', 'deleted_at'],
+    ['love_notes', 'audio_id'],
+    ['images', 'waveform'],
+    ['users', 'last_seen_at'],
+];
+
+async function isUpToDate() {
+    const res = await db.execute(
+        sql.raw(
+            `SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema = current_schema() AND (table_name, column_name) IN (${LATEST.map(([t, c]) => `('${t}','${c}')`).join(',')})`,
+        ),
+    );
+    const rows = (res as unknown as { rows?: { n: number }[] }).rows ?? (res as unknown as { n: number }[]);
+    return Number(rows?.[0]?.n) === LATEST.length;
+}
+
 let ready: Promise<void> | null = null;
 
 export function ensureSchema() {
@@ -61,8 +81,10 @@ export function ensureSchema() {
         ready = (async () => {
             // DDL first: any query through the drizzle schema (even seeding)
             // selects the new columns and fails until they exist.
-            for (const stmt of TABLES) await db.execute(sql.raw(stmt));
-            await Promise.all(INDEXES.map((stmt) => db.execute(sql.raw(stmt))));
+            if (!(await isUpToDate())) {
+                for (const stmt of TABLES) await db.execute(sql.raw(stmt));
+                await Promise.all(INDEXES.map((stmt) => db.execute(sql.raw(stmt))));
+            }
             await seedUsers();
         })().catch((e) => {
             ready = null;
