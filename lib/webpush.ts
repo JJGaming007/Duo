@@ -53,7 +53,8 @@ export async function sendPushToPartner(
         ]);
 
         const kind = opts.kind ?? 'chat';
-        const payload = JSON.stringify({
+        const payloadFor = (to: string) => JSON.stringify({
+            to,
             title,
             body,
             url: url || '/chat',
@@ -74,7 +75,7 @@ export async function sendPushToPartner(
                                 auth: sub.auth,
                             },
                         },
-                        payload,
+                        payloadFor(sub.userId),
                         { TTL: 60 * 60 * 24, urgency: kind === 'chat' || kind === 'nudge' ? 'high' : 'normal' }
                     );
                 } catch (error: any) {

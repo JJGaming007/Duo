@@ -7,10 +7,22 @@ export type ChatMessage = {
     senderName: string;
     createdAt: string;
     replyToId: string | null;
-    replyTo: { id: string; content: string; senderId: string; senderName: string } | null;
+    replyTo: {
+        id: string
+        content: string
+        senderId: string
+        senderName: string
+        /** Thumbnail when the quoted message is a photo */
+        imageUrl?: string | null
+    } | null;
     readAt: string | null;
+    deliveredAt?: string | null;
+    editedAt?: string | null;
+    /** "Delete for everyone" placeholder */
+    deleted?: boolean;
     reactions: Record<string, string>;
     image: ChatImage | null;
+    audio?: ChatAudio | null;
     /** Set on optimistic messages / echoed back by the server */
     clientId?: string;
     pending?: boolean;
@@ -18,6 +30,9 @@ export type ChatMessage = {
 };
 
 export type ChatImage = { id: string; url: string; width: number; height: number };
+
+/** Voice message. `waveform` = ~48 bars, 0–100 */
+export type ChatAudio = { id: string; url: string; durationMs: number; waveform: number[] };
 
 export type PrayerDay = { date: string; 'user-1': number; 'user-2': number };
 

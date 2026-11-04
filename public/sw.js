@@ -1,7 +1,7 @@
 // Service Worker for Duo
 // Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'duo-v6';
+const CACHE_NAME = 'duo-v7';
 const NAV_TIMEOUT_MS = 3000;
 const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96.png'];
 const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
@@ -37,6 +37,15 @@ self.addEventListener('push', (event) => {
 
 async function handlePush(data) {
     const kind = data.kind || 'chat';
+
+    // Tell the sender it reached this phone (double grey tick), even with the app closed
+    if (kind === 'chat' && data.to) {
+        fetch('/api/messages/delivered', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: data.to }),
+        }).catch(() => {});
+    }
     const tag = data.tag || `duo-${kind}`;
     const url = data.url || '/';
     const title = data.title || 'Duo';
@@ -116,7 +125,8 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
 
     // Uploaded photos never change: cache-first (also works offline)
-    if (url.origin === self.location.origin && url.pathname.startsWith('/api/images/')) {
+    // (Range requests — audio seeking — must reach the server for 206 responses.)
+    if (url.origin === self.location.origin && url.pathname.startsWith('/api/images/') && !request.headers.has('range')) {
         event.respondWith(
             caches.match(request).then((cached) =>
                 cached || fetch(request).then((res) => { putInCache(request, res); return res; })

@@ -46,6 +46,11 @@ export const loveNotes = pgTable('love_notes', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     replyToId: uuid('reply_to_id'),
     imageId: uuid('image_id'),
+    audioId: uuid('audio_id'),
+    deliveredAt: timestamp('delivered_at'),
+    editedAt: timestamp('edited_at'),
+    // "Delete for everyone": the row stays as a placeholder
+    deletedAt: timestamp('deleted_at'),
     readAt: timestamp('read_at'),
     // { [userId]: emoji } — one reaction per person per message
     reactions: jsonb('reactions').$type<Record<string, string>>().default({}),
@@ -61,6 +66,9 @@ export const images = pgTable('images', {
     mime: text('mime').notNull(),
     width: integer('width').notNull().default(0),
     height: integer('height').notNull().default(0),
+    // Voice messages
+    durationMs: integer('duration_ms'),
+    waveform: jsonb('waveform').$type<number[]>(),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });

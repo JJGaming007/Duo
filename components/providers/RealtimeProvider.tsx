@@ -7,7 +7,7 @@ import { showBanner } from '@/components/Banner'
 import { startPresence } from '@/lib/presence'
 import { bindChannel, pusherClient, setPusherUserId } from '@/lib/pusher'
 import { registerServiceWorker, setAppBadge, showOsNotification, syncPushSubscription } from '@/lib/notifications'
-import { KEYS, patchMessages, unreadCount, upsertMessage, useDuo, useMe, useMessages, usePrayer, useSubjects } from '@/lib/data'
+import { asDeleted, KEYS, markDelivered, patchMessages, unreadCount, upsertMessage, useDuo, useMe, useMessages, usePrayer, useSubjects } from '@/lib/data'
 import type { ChatMessage, DuoMember } from '@/lib/types'
 
 /**
@@ -17,6 +17,8 @@ import type { ChatMessage, DuoMember } from '@/lib/types'
  *  - shows in-app banners (OS notifications come from Web Push via the SW),
  *  - keeps the app-icon badge in sync with unread messages.
  */
+const previewText = (m: ChatMessage) => (m.audio ? 'Voice message' : m.content || (m.image ? 'Photo' : ''))
+
 export default function RealtimeProvider() {
     const { ready, me, partnerName } = useMe()
     const router = useRouter()
@@ -46,6 +48,11 @@ export default function RealtimeProvider() {
         return startPresence(me, () => mutate(KEYS.duo))
     }, [ready, me])
 
+    // Double grey tick for the sender: this phone has the messages
+    useEffect(() => {
+        if (ready) markDelivered(me, messages)
+    }, [ready, me, messages])
+
     // Unread badge on the app icon
     const unread = unreadCount(messages, me)
     useEffect(() => {
@@ -64,13 +71,21 @@ export default function RealtimeProvider() {
                 patchMessages((list) => upsertMessage(list, msg))
                 if (msg.senderId === me) return
                 if (visible()) {
-                    if (pathRef.current !== '/chat') banner(msg.senderId, msg.content || 'Photo', '/chat')
+                    if (pathRef.current !== '/chat') banner(msg.senderId, previewText(msg), '/chat')
                 } else if (!pushActive.current) {
-                    showOsNotification(msg.senderName, msg.content.slice(0, 120) || 'Photo', 'chat', '/chat')
+                    showOsNotification(msg.senderName, previewText(msg).slice(0, 120), 'chat', '/chat')
                 }
             },
-            'delete-note': ({ messageId }: { messageId: string }) => {
-                patchMessages((list) => list.filter((m) => m.id !== messageId))
+            'edit-note': (msg: ChatMessage) => {
+                patchMessages((list) => list.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)))
+            },
+            'delete-note': ({ messageId, deleted }: { messageId: string; deleted?: boolean }) => {
+                // "Delete for everyone" leaves a placeholder (older servers removed the row)
+                patchMessages((list) => (deleted ? list.map((m) => (m.id === messageId ? asDeleted(m) : m)) : list.filter((m) => m.id !== messageId)))
+            },
+            'messages-delivered': ({ recipientId, at }: { recipientId: string; at: string }) => {
+                if (recipientId === me) return
+                patchMessages((list) => list.map((m) => (m.senderId === me && !m.deliveredAt ? { ...m, deliveredAt: at } : m)))
             },
             reaction: ({ messageId, reactions }: { messageId: string; reactions?: Record<string, string> }) => {
                 if (!reactions) return
@@ -78,7 +93,7 @@ export default function RealtimeProvider() {
             },
             'messages-read': ({ readerId, at }: { readerId: string; at: string }) => {
                 if (readerId === me) return
-                patchMessages((list) => list.map((m) => (m.senderId === me && !m.readAt ? { ...m, readAt: at } : m)))
+                patchMessages((list) => list.map((m) => (m.senderId === me && !m.readAt ? { ...m, readAt: at, deliveredAt: m.deliveredAt ?? at } : m)))
             },
             mood: ({ senderId, emoji, label }: { senderId: string; emoji: string | null; label: string | null }) => {
                 patchCache<DuoMember[]>(KEYS.duo, (list) =>

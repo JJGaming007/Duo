@@ -18,8 +18,8 @@ export const fetcher = (url: string) =>
  * background. This is what makes "open the app" feel instant.
  */
 function stripPending(data: unknown) {
-    type M = { image?: { url?: string } | null }
-    return Array.isArray(data) ? data.filter((m: M) => !m?.image?.url?.startsWith('blob:')) : data
+    type M = { image?: { url?: string } | null; audio?: { url?: string } | null }
+    return Array.isArray(data) ? data.filter((m: M) => !m?.image?.url?.startsWith('blob:') && !m?.audio?.url?.startsWith('blob:')) : data
 }
 
 function localStorageProvider(): Cache {

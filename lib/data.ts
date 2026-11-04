@@ -3,6 +3,7 @@
 // Data hooks + actions. All screens read from the same SWR keys, which the
 // RealtimeProvider keeps fresh from Pusher events, so switching tabs is instant.
 
+import { useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import { appMutate as globalMutate, patchCache } from './swr-mutate'
 import { useIdentity } from './identity'
@@ -10,6 +11,7 @@ import { getUserName, type DuoUser } from './constants'
 import { todayKey } from './dates'
 import type { ChatMessage, DuoMember, PrayerSubject, PrayerSummary } from './types'
 import { uploadImage, type PreparedImage } from './images'
+import { uploadVoice, type RecordedVoice } from './voice'
 
 export const KEYS = {
     messages: '/api/messages',
@@ -81,12 +83,18 @@ function preload(url: string) {
     })
 }
 
-// Photos of messages that are still uploading (kept so a failed send can be retried)
-const pendingImages = new Map<string, PreparedImage>()
+// Media of messages that are still uploading (kept so a failed send can be retried)
+const pendingMedia = new Map<string, { image?: PreparedImage; voice?: RecordedVoice }>()
 
-export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMessage | null, image?: PreparedImage) {
+export async function sendMessage(
+    me: DuoUser,
+    content: string,
+    replyTo: ChatMessage | null,
+    image?: PreparedImage,
+    voice?: RecordedVoice,
+) {
     const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    if (image) pendingImages.set(clientId, image)
+    if (image || voice) pendingMedia.set(clientId, { image, voice })
     const optimistic: ChatMessage = {
         id: clientId,
         clientId,
@@ -95,41 +103,75 @@ export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMes
         senderName: getUserName(me),
         createdAt: new Date().toISOString(),
         replyToId: replyTo?.id ?? null,
-        replyTo: replyTo
-            ? { id: replyTo.id, content: replyTo.content.slice(0, 120) || (replyTo.image ? 'Photo' : ''), senderId: replyTo.senderId, senderName: replyTo.senderName }
-            : null,
+        replyTo: replyTo ? quoteOf(replyTo) : null,
         readAt: null,
+        deliveredAt: null,
         reactions: {},
         // Show the local copy instantly; replaced by the uploaded URL once sent
         image: image ? { id: 'local', url: image.previewUrl, width: image.width, height: image.height } : null,
+        audio: voice ? { id: 'local', url: voice.url, durationMs: voice.durationMs, waveform: voice.waveform } : null,
         pending: true,
     }
     patchMessages((list) => upsertMessage(list, optimistic))
     try {
-        const uploaded = image ? await uploadImage(me, image) : null
+        const [uploadedImage, uploadedVoice] = await Promise.all([
+            image ? uploadImage(me, image) : null,
+            voice ? uploadVoice(me, voice) : null,
+        ])
         const { message } = await send<{ message: ChatMessage }>('/api/messages', 'POST', {
             senderId: me,
             content,
             replyToId: replyTo?.id,
-            imageId: uploaded?.id,
+            imageId: uploadedImage?.id,
+            audioId: uploadedVoice?.id,
             clientId,
         })
         // Swap the local preview for the uploaded URL once that has loaded (no flicker).
         // The cache is persisted, so a blob: URL must never stay in it.
         if (message.image) await preload(message.image.url)
         patchMessages((list) => upsertMessage(list, { ...message, clientId }))
-        pendingImages.delete(clientId)
+        pendingMedia.delete(clientId)
     } catch (e) {
         patchMessages((list) => list.map((m) => (m.clientId === clientId ? { ...m, pending: false, failed: true } : m)))
         throw e
     }
 }
 
+/** What a reply bubble shows about the message it quotes */
+export function quoteOf(m: ChatMessage): NonNullable<ChatMessage['replyTo']> {
+    return {
+        id: m.id,
+        content: m.deleted ? 'Deleted message' : m.content.slice(0, 120) || (m.image ? 'Photo' : m.audio ? 'Voice message' : ''),
+        senderId: m.senderId,
+        senderName: m.senderName,
+        imageUrl: m.image && !m.image.url.startsWith('blob:') ? m.image.url : null,
+    }
+}
+
 export async function retryMessage(me: DuoUser, msg: ChatMessage) {
-    const image = msg.clientId ? pendingImages.get(msg.clientId) : undefined
-    if (msg.clientId) pendingImages.delete(msg.clientId)
+    const media = msg.clientId ? pendingMedia.get(msg.clientId) : undefined
+    if (msg.clientId) pendingMedia.delete(msg.clientId)
     patchMessages((list) => list.filter((m) => m.clientId !== msg.clientId))
-    await sendMessage(me, msg.content, msg.replyTo ? ({ ...msg.replyTo } as ChatMessage) : null, image)
+    const reply = msg.replyTo ? ({ ...msg.replyTo, image: null, audio: null, deleted: false } as unknown as ChatMessage) : null
+    await sendMessage(me, msg.content, reply, media?.image, media?.voice)
+}
+
+/** Edit my own text message (server allows 15 minutes) */
+export const EDIT_WINDOW_MS = 15 * 60 * 1000
+export function canEdit(m: ChatMessage, me: DuoUser) {
+    return m.senderId === me && !m.deleted && !m.audio && !m.pending && !m.failed && Date.now() - new Date(m.createdAt).getTime() < EDIT_WINDOW_MS
+}
+
+export async function editMessage(me: DuoUser, id: string, content: string) {
+    const before = await patchMessages((list) => list)
+    patchMessages((list) => list.map((m) => (m.id === id ? { ...m, content, editedAt: new Date().toISOString() } : m)))
+    try {
+        const { message } = await send<{ message: ChatMessage }>('/api/messages', 'PATCH', { messageId: id, senderId: me, content })
+        patchMessages((list) => upsertMessage(list, message))
+    } catch (e) {
+        if (before) globalMutate(KEYS.messages, before, { revalidate: false })
+        throw e
+    }
 }
 
 export async function setProfilePhoto(me: DuoUser, image: PreparedImage | null) {
@@ -138,15 +180,68 @@ export async function setProfilePhoto(me: DuoUser, image: PreparedImage | null) 
     await globalMutate(KEYS.duo)
 }
 
+/** Turn a message into the "This message was deleted" placeholder */
+export const asDeleted = (m: ChatMessage): ChatMessage => ({ ...m, deleted: true, content: '', image: null, audio: null, reactions: {} })
+
+/** Delete for everyone (my own messages) */
 export async function deleteMessage(me: DuoUser, id: string) {
     const before = await patchMessages((list) => list) // snapshot for rollback
-    patchMessages((list) => list.filter((m) => m.id !== id))
+    patchMessages((list) => list.map((m) => (m.id === id ? asDeleted(m) : m)))
     try {
         await send('/api/messages', 'DELETE', { messageId: id, senderId: me })
     } catch (e) {
         if (before) globalMutate(KEYS.messages, before, { revalidate: false })
         throw e
     }
+}
+
+// "Delete for me": hidden on this device only
+const HIDDEN_KEY = 'duo-hidden-messages'
+const hiddenListeners = new Set<() => void>()
+let hiddenCache: Set<string> | null = null
+function readHidden() {
+    if (!hiddenCache) {
+        try {
+            hiddenCache = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'))
+        } catch {
+            hiddenCache = new Set()
+        }
+    }
+    return hiddenCache
+}
+export function hideForMe(id: string) {
+    const next = new Set(readHidden()).add(id)
+    hiddenCache = next
+    try {
+        localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next].slice(-2000)))
+    } catch { }
+    hiddenListeners.forEach((l) => l())
+}
+export function useHiddenMessages() {
+    return useSyncExternalStore(
+        (cb) => {
+            hiddenListeners.add(cb)
+            return () => hiddenListeners.delete(cb)
+        },
+        readHidden,
+        () => EMPTY_SET,
+    )
+}
+const EMPTY_SET = new Set<string>()
+
+let lastDeliveredPost = 0
+/** Tell the server my phone received the partner's messages (sender sees ✓✓) */
+export function markDelivered(me: DuoUser, list: ChatMessage[] | undefined) {
+    if (!list?.some((m) => m.senderId !== me && !m.deliveredAt && !m.readAt)) return
+    if (Date.now() - lastDeliveredPost < 2000) return
+    lastDeliveredPost = Date.now()
+    send('/api/messages/delivered', 'POST', { userId: me }).catch(() => { })
+}
+
+export async function searchMessages(q: string) {
+    const res = await fetch(`/api/messages/search?q=${encodeURIComponent(q)}`)
+    if (!res.ok) throw new Error('Search failed')
+    return (await res.json()) as ChatMessage[]
 }
 
 export async function reactToMessage(me: DuoUser, id: string, emoji: string) {
@@ -192,14 +287,14 @@ export async function fetchOlderMessages(before: string) {
 }
 
 export function unreadCount(list: ChatMessage[] | undefined, me: DuoUser) {
-    return (list ?? []).filter((m) => m.senderId !== me && !m.readAt).length
+    return (list ?? []).filter((m) => m.senderId !== me && !m.readAt && !m.deleted).length
 }
 
 const lastTyping = { t: 0 }
-export function sendTyping(me: DuoUser) {
+export function sendTyping(me: DuoUser, kind: 'typing' | 'recording' = 'typing') {
     if (Date.now() - lastTyping.t < 2500) return
     lastTyping.t = Date.now()
-    send('/api/bond/nudge', 'POST', { senderId: me, type: 'typing' }).catch(() => { })
+    send('/api/bond/nudge', 'POST', { senderId: me, type: kind }).catch(() => { })
 }
 
 export function sendNudge(me: DuoUser) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, isNull, ne } from 'drizzle-orm';
+import { and, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { loveNotes } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
         const at = new Date();
         const updated = await db
             .update(loveNotes)
-            .set({ readAt: at })
+            .set({ readAt: at, deliveredAt: sql`coalesce(${loveNotes.deliveredAt}, ${at})` })
             .where(and(ne(loveNotes.senderId, userId), isNull(loveNotes.readAt)))
             .returning({ id: loveNotes.id });
 

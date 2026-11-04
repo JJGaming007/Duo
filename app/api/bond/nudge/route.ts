@@ -14,11 +14,12 @@ export async function POST(req: Request) {
         const { getUserName } = await import('@/lib/constants');
         const senderName = getUserName(senderId);
 
-        // Handle typing indicator (no push needed)
-        if (type === 'typing') {
+        // Typing / recording indicators (no push needed)
+        if (type === 'typing' || type === 'recording') {
             await pusherServer.trigger('bond-update', 'typing', {
                 senderId,
-                senderName
+                senderName,
+                kind: type,
             });
             return NextResponse.json({ success: true });
         }

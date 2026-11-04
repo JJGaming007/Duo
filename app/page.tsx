@@ -56,7 +56,11 @@ export default function TodayPage() {
                         }
                         subtitle={
                             <span className={cn(unread > 0 && 'text-white')}>
-                                {last ? `${last.senderId === me ? 'You: ' : ''}${last.content || (last.image ? 'Photo' : '')}` : 'No messages yet'}
+                                {last
+                                    ? last.deleted
+                                        ? 'This message was deleted'
+                                        : `${last.senderId === me ? 'You: ' : ''}${last.audio ? 'Voice message' : last.content || (last.image ? 'Photo' : '')}`
+                                    : 'No messages yet'}
                             </span>
                         }
                         trailing={
