@@ -59,7 +59,25 @@ async function decode(file: Blob): Promise<Decoded> {
 
 const UPLOADABLE = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const RAW_LIMIT = 3 * 1024 * 1024
-const isHeic = (f: File) => /heic|heif/i.test(f.type) || /\.(heic|heif)$/i.test(f.name)
+
+/** HEIC/HEIF detection from the file header (Samsung often sends no MIME type). */
+async function looksLikeHeic(f: File) {
+    if (/heic|heif/i.test(f.type) || /\.(heic|heif)$/i.test(f.name)) return true
+    try {
+        const head = new Uint8Array(await f.slice(0, 16).arrayBuffer())
+        const box = String.fromCharCode(...head.slice(4, 12)) // e.g. "ftypheic"
+        return /^ftyp(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(box)
+    } catch {
+        return false
+    }
+}
+
+/** Convert HEIC → JPEG in the browser. The decoder (~1 MB gzipped) is only
+ *  downloaded the first time someone picks a HEIC photo. */
+async function heicToJpeg(f: File): Promise<Blob> {
+    const { heicTo } = await import('heic-to')
+    return heicTo({ blob: f, type: 'image/jpeg', quality: 0.92 })
+}
 
 /**
  * Resize on the device before upload: photos straight from a phone camera are
@@ -69,19 +87,23 @@ export async function prepareImage(file: File, opts: { max: number; square?: boo
     // Some Android pickers give an empty type, so only reject clear non-images
     if (file.type && !file.type.startsWith('image/')) throw new Error('That file isn’t a photo')
 
+    const heic = await looksLikeHeic(file)
     let decoded: Decoded
     try {
-        decoded = await decode(file)
+        // Safari reads HEIC natively; other browsers (e.g. Chrome on Samsung) can't,
+        // so convert first instead of waiting for the native attempt to fail.
+        decoded = heic && !isApple() ? await decode(await heicToJpeg(file)) : await decode(file)
     } catch {
-        // Can't decode here — send the original if the server can take it as-is
-        if (!opts.square && UPLOADABLE.has(file.type) && file.size <= RAW_LIMIT) {
-            return { blob: file, width: 0, height: 0, previewUrl: URL.createObjectURL(file) }
+        try {
+            if (heic) decoded = await decode(await heicToJpeg(file))
+            else throw new Error('undecodable')
+        } catch {
+            // Can't decode here — send the original if the server can take it as-is
+            if (!heic && !opts.square && UPLOADABLE.has(file.type) && file.size <= RAW_LIMIT) {
+                return { blob: file, width: 0, height: 0, previewUrl: URL.createObjectURL(file) }
+            }
+            throw new Error(heic ? 'Couldn’t convert that HEIC photo. Try another one, or a screenshot of it.' : 'Couldn’t open that photo. Try a different one.')
         }
-        throw new Error(
-            isHeic(file)
-                ? 'This phone can’t open HEIC photos here. Try a screenshot of it, or set Camera → Formats → Most Compatible.'
-                : 'Couldn’t open that photo. Try a different one.',
-        )
     }
 
     const { source, width: sw, height: sh, close } = decoded

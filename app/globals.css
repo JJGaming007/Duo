@@ -34,6 +34,12 @@ body {
   }
 }
 
+/* Android: lib/elastic.ts draws an iOS-style bounce, so turn off the native
+   stretch/glow to avoid both at once. */
+html.elastic-scroll * {
+  overscroll-behavior-y: none;
+}
+
 /* Remove the 300ms tap delay / grey tap flash on mobile */
 a, button {
   touch-action: manipulation;

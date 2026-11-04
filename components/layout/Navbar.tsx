@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useCodingMode } from '@/lib/prefs'
 import { unreadCount, useMe, useMessages } from '@/lib/data'
 import { useKeyboard } from '@/lib/keyboard'
+import { initElasticScroll } from '@/lib/elastic'
+import { useEffect } from 'react'
 
 export const CODE_ROUTES = ['/code', '/tracker', '/log', '/analytics', '/playground']
 
@@ -17,6 +19,7 @@ export function Navbar() {
     const { data: messages } = useMessages()
     const unread = unreadCount(messages, me)
     useKeyboard() // starts keyboard tracking app-wide (hides this bar while typing)
+    useEffect(() => initElasticScroll(), []) // iOS-style bounce at scroll ends (Android)
 
     const items = [
         { name: 'Today', href: '/', icon: Home, active: pathname === '/' },
