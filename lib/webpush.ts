@@ -3,12 +3,21 @@ import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { eq, ne } from 'drizzle-orm';
 
+/**
+ * web-push requires URL-safe base64 without padding. Env values pasted into
+ * dashboards often carry quotes, whitespace, '=' padding or standard base64.
+ */
+export function cleanVapidKey(key: string | undefined) {
+    if (!key) return key;
+    return key.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 // Lazily configure web-push with VAPID keys (deferred so it doesn't crash at build time)
 let vapidConfigured = false;
 function ensureVapidConfigured() {
     if (vapidConfigured) return;
-    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    const publicKey = cleanVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+    const privateKey = cleanVapidKey(process.env.VAPID_PRIVATE_KEY);
     if (!publicKey || !privateKey) {
         console.warn('VAPID keys not set — push notifications disabled');
         return;

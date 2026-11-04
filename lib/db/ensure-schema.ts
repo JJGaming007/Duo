@@ -41,9 +41,11 @@ let ready: Promise<void> | null = null;
 export function ensureSchema() {
     if (!ready) {
         ready = (async () => {
-            await seedUsers();
+            // DDL first: any query through the drizzle schema (even seeding)
+            // selects the new columns and fails until they exist.
             for (const stmt of TABLES) await db.execute(sql.raw(stmt));
             await Promise.all(INDEXES.map((stmt) => db.execute(sql.raw(stmt))));
+            await seedUsers();
         })().catch((e) => {
             ready = null;
             throw e;

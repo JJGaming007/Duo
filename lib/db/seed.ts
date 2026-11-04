@@ -11,7 +11,9 @@ export function seedUsers() {
 }
 
 async function doSeed() {
-    const existing = await db.select().from(users);
+    // Select only `id`: selecting all schema columns would fail before
+    // ensureSchema() has added newer columns (e.g. mood_emoji).
+    const existing = await db.select({ id: users.id }).from(users);
 
     if (existing.length < 2) {
         console.log('Seeding hardcoded Duo users...');

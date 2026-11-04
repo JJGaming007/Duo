@@ -56,7 +56,7 @@ const SUB_KEY = 'duo-push-sub';
 export async function syncPushSubscription(userId: string, force = false): Promise<boolean> {
     try {
         if (getNotificationState() !== 'granted') return false;
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '');
         if (!vapidKey) return false;
 
         const registration = await navigator.serviceWorker.ready;
