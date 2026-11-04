@@ -19,6 +19,7 @@ export async function GET() {
             moodEmoji: u.moodEmoji ?? null,
             moodLabel: u.moodLabel ?? null,
             moodUpdatedAt: u.moodUpdatedAt ? new Date(u.moodUpdatedAt).toISOString() : null,
+            image: u.image ?? null,
         }));
         return NextResponse.json(members);
     } catch (error) {
@@ -27,11 +28,24 @@ export async function GET() {
 }
 
 // POST { userId, emoji, label } — set (or clear with empty emoji) my mood
+// POST { userId, image: '/api/images/<id>' | null } — set or remove my profile picture
 export async function POST(req: Request) {
     try {
         await ensureSchema();
-        const { userId, emoji, label } = await req.json();
+        const body = await req.json();
+        const { userId, emoji, label } = body;
         if (!isDuoUser(userId)) return badRequest('Invalid user');
+
+        if ('image' in body) {
+            const image = body.image;
+            if (image !== null && !(typeof image === 'string' && /^\/api\/images\/[0-9a-f-]{36}$/i.test(image))) {
+                return badRequest('Invalid image');
+            }
+            await db.update(users).set({ image }).where(eq(users.id, userId));
+            await pusherServer.trigger('bond-update', 'profile', { senderId: userId }).catch(() => {});
+            return NextResponse.json({ success: true });
+        }
+
         const e = typeof emoji === 'string' && emoji ? emoji.slice(0, 16) : null;
         const l = e && typeof label === 'string' ? label.slice(0, 40) : null;
 

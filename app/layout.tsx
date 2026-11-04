@@ -29,6 +29,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  // Android: shrink the page when the keyboard opens (iOS ignores this; see lib/keyboard.ts)
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

@@ -24,7 +24,18 @@ const TABLES = [
         answered_at timestamp,
         created_at timestamp NOT NULL DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS images (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        data text NOT NULL,
+        mime text NOT NULL,
+        width integer NOT NULL DEFAULT 0,
+        height integer NOT NULL DEFAULT 0,
+        created_by text REFERENCES users(id) ON DELETE CASCADE,
+        created_at timestamp NOT NULL DEFAULT now()
+    )`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS reply_to_id uuid`,
+    `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS image_id uuid`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS read_at timestamp`,
     `ALTER TABLE love_notes ADD COLUMN IF NOT EXISTS reactions jsonb DEFAULT '{}'::jsonb`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_emoji text`,

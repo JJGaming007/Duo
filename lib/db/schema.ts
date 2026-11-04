@@ -44,12 +44,25 @@ export const loveNotes = pgTable('love_notes', {
     content: text('content').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     replyToId: uuid('reply_to_id'),
+    imageId: uuid('image_id'),
     readAt: timestamp('read_at'),
     // { [userId]: emoji } — one reaction per person per message
     reactions: jsonb('reactions').$type<Record<string, string>>().default({}),
 }, (table) => ({
     createdAtIdx: index('love_notes_created_at_idx').on(table.createdAt),
 }));
+
+// Uploaded images (chat photos + profile pictures), already resized on the client.
+// Stored as base64 and served from /api/images/[id] with immutable caching.
+export const images = pgTable('images', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    data: text('data').notNull(),
+    mime: text('mime').notNull(),
+    width: integer('width').notNull().default(0),
+    height: integer('height').notNull().default(0),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
 
 // How many times each person prayed on a given (local) day
 export const prayerLogs = pgTable('prayer_logs', {

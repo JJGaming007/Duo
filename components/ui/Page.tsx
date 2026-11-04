@@ -1,6 +1,9 @@
+"use client"
+
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDuo } from '@/lib/data'
 
 // Building blocks modelled on native grouped lists (iOS Settings / Reminders).
 
@@ -88,17 +91,23 @@ export function Row({
     return <div className={cls}>{inner}</div>
 }
 
-export function Avatar({ name, user, size = 'md' }: { name: string; user: string; size?: 'sm' | 'md' | 'lg' }) {
-    const sizes = { sm: 'h-7 w-7 text-[12px]', md: 'h-9 w-9 text-[14px]', lg: 'h-12 w-12 text-[18px]' }
+export function Avatar({ name, user, size = 'md' }: { name: string; user: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+    const { data: members } = useDuo()
+    const src = members?.find((m) => m.id === user)?.image
+    const sizes = { sm: 'h-7 w-7 text-[12px]', md: 'h-9 w-9 text-[14px]', lg: 'h-12 w-12 text-[18px]', xl: 'h-20 w-20 text-[30px]' }
     return (
         <span
             className={cn(
-                'flex shrink-0 items-center justify-center rounded-full font-semibold text-white',
+                'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white',
                 user === 'user-1' ? 'bg-me' : 'bg-partner',
                 sizes[size],
             )}
         >
             {name.charAt(0).toUpperCase()}
+            {src && (
+                // eslint-disable-next-line @next/next/no-img-element -- small, already-resized avatar
+                <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+            )}
         </span>
     )
 }

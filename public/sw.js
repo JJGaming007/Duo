@@ -1,7 +1,7 @@
 // Service Worker for Duo
 // Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'duo-v4';
+const CACHE_NAME = 'duo-v5';
 const NAV_TIMEOUT_MS = 3000;
 const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
@@ -120,6 +120,17 @@ self.addEventListener('fetch', (event) => {
     if (request.method !== 'GET') return;
 
     const url = new URL(request.url);
+
+    // Uploaded photos never change: cache-first (also works offline)
+    if (url.origin === self.location.origin && url.pathname.startsWith('/api/images/')) {
+        event.respondWith(
+            caches.match(request).then((cached) =>
+                cached || fetch(request).then((res) => { putInCache(request, res); return res; })
+            )
+        );
+        return;
+    }
+
     // API data is cached by the app (SWR); skip API and cross-origin requests
     if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 

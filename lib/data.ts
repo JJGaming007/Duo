@@ -9,6 +9,7 @@ import { useIdentity } from './identity'
 import { getUserName, type DuoUser } from './constants'
 import { todayKey } from './dates'
 import type { ChatMessage, DuoMember, PrayerSubject, PrayerSummary } from './types'
+import { uploadImage, type PreparedImage } from './images'
 
 export const KEYS = {
     messages: '/api/messages',
@@ -71,8 +72,21 @@ export function patchMessages(fn: (list: ChatMessage[]) => ChatMessage[]) {
     return patchCache<ChatMessage[]>(KEYS.messages, fn)
 }
 
-export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMessage | null) {
+function preload(url: string) {
+    return new Promise<void>((resolve) => {
+        const img = new Image()
+        img.onload = img.onerror = () => resolve()
+        img.src = url
+        setTimeout(resolve, 4000)
+    })
+}
+
+// Photos of messages that are still uploading (kept so a failed send can be retried)
+const pendingImages = new Map<string, PreparedImage>()
+
+export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMessage | null, image?: PreparedImage) {
     const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    if (image) pendingImages.set(clientId, image)
     const optimistic: ChatMessage = {
         id: clientId,
         clientId,
@@ -82,21 +96,29 @@ export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMes
         createdAt: new Date().toISOString(),
         replyToId: replyTo?.id ?? null,
         replyTo: replyTo
-            ? { id: replyTo.id, content: replyTo.content.slice(0, 120), senderId: replyTo.senderId, senderName: replyTo.senderName }
+            ? { id: replyTo.id, content: replyTo.content.slice(0, 120) || (replyTo.image ? 'Photo' : ''), senderId: replyTo.senderId, senderName: replyTo.senderName }
             : null,
         readAt: null,
         reactions: {},
+        // Show the local copy instantly; replaced by the uploaded URL once sent
+        image: image ? { id: 'local', url: image.previewUrl, width: image.width, height: image.height } : null,
         pending: true,
     }
     patchMessages((list) => upsertMessage(list, optimistic))
     try {
+        const uploaded = image ? await uploadImage(me, image) : null
         const { message } = await send<{ message: ChatMessage }>('/api/messages', 'POST', {
             senderId: me,
             content,
             replyToId: replyTo?.id,
+            imageId: uploaded?.id,
             clientId,
         })
+        // Swap the local preview for the uploaded URL once that has loaded (no flicker).
+        // The cache is persisted, so a blob: URL must never stay in it.
+        if (message.image) await preload(message.image.url)
         patchMessages((list) => upsertMessage(list, { ...message, clientId }))
+        pendingImages.delete(clientId)
     } catch (e) {
         patchMessages((list) => list.map((m) => (m.clientId === clientId ? { ...m, pending: false, failed: true } : m)))
         throw e
@@ -104,8 +126,16 @@ export async function sendMessage(me: DuoUser, content: string, replyTo: ChatMes
 }
 
 export async function retryMessage(me: DuoUser, msg: ChatMessage) {
+    const image = msg.clientId ? pendingImages.get(msg.clientId) : undefined
+    if (msg.clientId) pendingImages.delete(msg.clientId)
     patchMessages((list) => list.filter((m) => m.clientId !== msg.clientId))
-    await sendMessage(me, msg.content, msg.replyTo ? ({ ...msg.replyTo } as ChatMessage) : null)
+    await sendMessage(me, msg.content, msg.replyTo ? ({ ...msg.replyTo } as ChatMessage) : null, image)
+}
+
+export async function setProfilePhoto(me: DuoUser, image: PreparedImage | null) {
+    const url = image ? (await uploadImage(me, image)).url : null
+    await send('/api/duo', 'POST', { userId: me, image: url })
+    await globalMutate(KEYS.duo)
 }
 
 export async function deleteMessage(me: DuoUser, id: string) {

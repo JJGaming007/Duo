@@ -78,9 +78,9 @@ export default function RealtimeProvider() {
                 patchMessages((list) => upsertMessage(list, msg))
                 if (msg.senderId === me) return
                 if (visible()) {
-                    if (pathRef.current !== '/chat') banner(msg.senderName, msg.content, '/chat')
+                    if (pathRef.current !== '/chat') banner(msg.senderName, msg.content || 'Photo', '/chat')
                 } else if (!pushActive.current) {
-                    showOsNotification(msg.senderName, msg.content.slice(0, 120), 'chat', '/chat')
+                    showOsNotification(msg.senderName, msg.content.slice(0, 120) || 'Photo', 'chat', '/chat')
                 }
             },
             'delete-note': ({ messageId }: { messageId: string }) => {
@@ -98,6 +98,9 @@ export default function RealtimeProvider() {
                 patchCache<DuoMember[]>(KEYS.duo, (list) =>
                     list.map((u) => (u.id === senderId ? { ...u, moodEmoji: emoji, moodLabel: label } : u)),
                 )
+            },
+            profile: () => {
+                mutate(KEYS.duo)
             },
             nudge: ({ senderId, senderName }: { senderId: string; senderName: string }) => {
                 if (senderId !== me && visible()) banner(senderName, 'Sent you a nudge', '/chat')

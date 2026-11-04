@@ -10,11 +10,14 @@ export type ChatMessage = {
     replyTo: { id: string; content: string; senderId: string; senderName: string } | null;
     readAt: string | null;
     reactions: Record<string, string>;
+    image: ChatImage | null;
     /** Set on optimistic messages / echoed back by the server */
     clientId?: string;
     pending?: boolean;
     failed?: boolean;
 };
+
+export type ChatImage = { id: string; url: string; width: number; height: number };
 
 export type PrayerDay = { date: string; 'user-1': number; 'user-2': number };
 
@@ -44,4 +47,6 @@ export type DuoMember = {
     moodEmoji: string | null;
     moodLabel: string | null;
     moodUpdatedAt: string | null;
+    /** Profile picture URL (/api/images/<id>) */
+    image: string | null;
 };

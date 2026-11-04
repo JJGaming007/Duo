@@ -23,6 +23,17 @@ body {
   color-scheme: dark;
 }
 
+/* While the on-screen keyboard is open (set by lib/keyboard.ts): hide the
+   tab bar and drop the space reserved for it, so content sits on the keyboard. */
+@media (max-width: 767px) {
+  html[data-keyboard] [data-tabbar] {
+    display: none;
+  }
+  html[data-keyboard] body {
+    padding-bottom: 0 !important;
+  }
+}
+
 /* Remove the 300ms tap delay / grey tap flash on mobile */
 a, button {
   touch-action: manipulation;

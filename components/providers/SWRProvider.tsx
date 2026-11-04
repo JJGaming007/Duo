@@ -17,6 +17,11 @@ export const fetcher = (url: string) =>
  * renders immediately with the last data it showed, then revalidates in the
  * background. This is what makes "open the app" feel instant.
  */
+function stripPending(data: unknown) {
+    type M = { image?: { url?: string } | null }
+    return Array.isArray(data) ? data.filter((m: M) => !m?.image?.url?.startsWith('blob:')) : data
+}
+
 function localStorageProvider(): Cache {
     let entries: [string, unknown][] = []
     try {
@@ -28,7 +33,9 @@ function localStorageProvider(): Cache {
         try {
             const data = Array.from(map.entries() as Iterable<[string, { data?: unknown } | undefined]>)
                 .filter(([k, v]) => !k.startsWith('$') && v?.data !== undefined)
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.map(([k, v]) => [k, { data: v!.data }])))
+            const json = JSON.stringify(data.map(([k, v]) => [k, { data: v!.data }]))
+            // Drop unsent photo messages: their in-memory previews don't survive a reload
+            localStorage.setItem(STORAGE_KEY, json.includes('"blob:') ? JSON.stringify(data.map(([k, v]) => [k, { data: stripPending(v!.data) }])) : json)
         } catch { }
     }
     window.addEventListener('pagehide', persist)

@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, CornerUpLeft, Hand, Loader2, Smile, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, CornerUpLeft, Download, Hand, ImagePlus, Loader2, Smile, Trash2, X } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Avatar } from '@/components/ui/Page'
 import { bindChannel } from '@/lib/pusher'
@@ -23,6 +23,8 @@ import {
 import { dayLabel, timeLabel } from '@/lib/dates'
 import { MOOD_OPTIONS, QUICK_EMOJIS, REACTION_EMOJIS } from '@/lib/moods'
 import { cn } from '@/lib/utils'
+import { useKeyboard } from '@/lib/keyboard'
+import { prepareImage, type PreparedImage } from '@/lib/images'
 import type { ChatMessage } from '@/lib/types'
 
 const GROUP_GAP_MS = 3 * 60 * 1000
@@ -38,6 +40,8 @@ export default function ChatPage() {
     const [partnerTyping, setPartnerTyping] = useState(false)
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
     const [selected, setSelected] = useState<ChatMessage | null>(null)
+    const [viewing, setViewing] = useState<ChatMessage | null>(null)
+    const kb = useKeyboard()
     const [showJump, setShowJump] = useState(false)
     const listRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -97,6 +101,10 @@ export default function ChatPage() {
         if (newestMine) scrollToBottom()
     }, [newestId, newestMine, scrollToBottom])
 
+    useEffect(() => {
+        if (kb.open) scrollToBottom()
+    }, [kb.open, kb.height, scrollToBottom])
+
     const onScroll = () => {
         const el = listRef.current
         if (!el) return
@@ -126,7 +134,13 @@ export default function ChatPage() {
             : ''
 
     return (
-        <div className="mx-auto flex h-full w-full max-w-3xl flex-col">
+        <div
+            className="mx-auto flex h-full w-full max-w-3xl flex-col bg-black"
+            // While typing, pin the whole chat to the area above the keyboard.
+            // (iOS scrolls the page instead of resizing it, which is what made
+            // the header and tab bar jump around.)
+            style={kb.open ? { position: 'fixed', left: 0, right: 0, top: kb.top, height: kb.height, zIndex: 60 } : undefined}
+        >
             <ChatHeader
                 partner={partner}
                 partnerName={partnerName}
@@ -177,6 +191,7 @@ export default function ChatPage() {
                                     onOpen={() => setSelected(m)}
                                     onDoubleTap={() => !m.pending && reactToMessage(me, m.id, '❤️').catch(() => { })}
                                     onRetry={() => retryMessage(me, m).catch(() => toast.error('Still failing to send'))}
+                                    onViewImage={() => setViewing(m)}
                                 />
                                 {!sameDayAsOlder && (
                                     <p className="mb-1 mt-5 text-center text-[12px] font-medium text-muted">{dayLabel(m.createdAt)}</p>
@@ -224,12 +239,29 @@ export default function ChatPage() {
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
                 onTyping={() => sendTyping(me)}
-                onSend={(text) => {
+                onSend={(text, image) => {
                     const reply = replyTo
                     setReplyTo(null)
-                    sendMessage(me, text, reply).catch(() => toast.error('Not delivered — tap the message to retry'))
+                    sendMessage(me, text, reply, image).catch(() => toast.error('Not delivered — tap the message to retry'))
                 }}
             />
+
+            {viewing?.image && (
+                <PhotoViewer
+                    m={viewing}
+                    mine={viewing.senderId === me}
+                    onClose={() => setViewing(null)}
+                    onReply={() => {
+                        setReplyTo(viewing)
+                        setViewing(null)
+                        inputRef.current?.focus()
+                    }}
+                    onMore={() => {
+                        setSelected(viewing)
+                        setViewing(null)
+                    }}
+                />
+            )}
 
             {selected && (
                 <ActionSheet
@@ -371,6 +403,7 @@ function Bubble({
     onOpen,
     onDoubleTap,
     onRetry,
+    onViewImage,
 }: {
     m: ChatMessage
     mine: boolean
@@ -381,9 +414,11 @@ function Bubble({
     onOpen: () => void
     onDoubleTap: () => void
     onRetry: () => void
+    onViewImage: () => void
 }) {
     const lastTap = useRef(0)
-    const emojiOnly = m.content.length <= 16 && EMOJI_ONLY.test(m.content)
+    const image = m.image
+    const emojiOnly = !image && !!m.content && m.content.length <= 16 && EMOJI_ONLY.test(m.content)
     const reactions = Object.entries(m.reactions ?? {})
 
     const handleClick = () => {
@@ -413,7 +448,9 @@ function Bubble({
                     className={cn(
                         'relative block w-full select-text text-left transition-opacity',
                         m.pending && 'opacity-70',
-                        emojiOnly
+                        image
+                            ? cn('rounded-[18px]', m.content || m.replyTo ? (mine ? 'bg-accent text-white' : 'bg-surface-2 text-white') : '', m.failed && 'ring-1 ring-[#ff453a]')
+                            : emojiOnly
                             ? 'px-1 text-5xl leading-tight'
                             : cn(
                                 'rounded-[18px] px-3 py-[7px] text-[16px] leading-[21px]',
@@ -427,6 +464,7 @@ function Bubble({
                         <span
                             className={cn(
                                 'mb-1 block rounded-lg border-l-[3px] px-2 py-1 text-[13px] leading-snug',
+                                image && 'mx-1 mt-1',
                                 mine ? 'border-white/70 bg-black/15 text-white/85' : 'border-accent bg-black/25 text-white/75',
                             )}
                         >
@@ -434,7 +472,31 @@ function Bubble({
                             <span className="line-clamp-2">{m.replyTo.content}</span>
                         </span>
                     )}
-                    <span className="whitespace-pre-wrap break-words">{renderText(m.content)}</span>
+                    {image && (
+                        <span
+                            className={cn('block overflow-hidden', m.content || m.replyTo ? 'rounded-[16px] m-[3px]' : 'rounded-[18px]')}
+                            onClick={(e) => {
+                                if (m.pending || m.failed) return
+                                e.stopPropagation()
+                                onViewImage()
+                            }}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- user photo, already resized */}
+                            <img
+                                src={image.url}
+                                alt="Photo"
+                                loading="lazy"
+                                draggable={false}
+                                className="block w-[240px] max-w-full bg-surface object-cover"
+                                style={{ aspectRatio: image.width && image.height ? `${image.width} / ${image.height}` : '4 / 3', maxHeight: 340 }}
+                            />
+                        </span>
+                    )}
+                    {m.content && (
+                        <span className={cn('block whitespace-pre-wrap break-words', image && 'px-3 pb-[7px] pt-1 text-[16px] leading-[21px]')}>
+                            {renderText(m.content)}
+                        </span>
+                    )}
 
                     {reactions.length > 0 && (
                         <span
@@ -487,10 +549,27 @@ function Composer({
     replyTo: ChatMessage | null
     onCancelReply: () => void
     onTyping: () => void
-    onSend: (text: string) => void
+    onSend: (text: string, image?: PreparedImage) => void
 }) {
     const [text, setText] = useState('')
     const [emojiOpen, setEmojiOpen] = useState(false)
+    const [photo, setPhoto] = useState<PreparedImage | null>(null)
+    const [preparing, setPreparing] = useState(false)
+    const fileRef = useRef<HTMLInputElement>(null)
+
+    const attach = async (file: File | undefined | null) => {
+        if (!file) return
+        setPreparing(true)
+        try {
+            setPhoto(await prepareImage(file, { max: 1600 }))
+            setEmojiOpen(false)
+            inputRef.current?.focus()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Couldn’t use that photo')
+        } finally {
+            setPreparing(false)
+        }
+    }
 
     const resize = () => {
         const el = inputRef.current
@@ -499,10 +578,12 @@ function Composer({
         el.style.height = `${Math.min(el.scrollHeight, 140)}px`
     }
 
-    const submit = (value = text) => {
+    const submit = (value = text, withPhoto = true) => {
         const t = value.trim()
-        if (!t) return
-        onSend(t)
+        const img = withPhoto ? photo ?? undefined : undefined
+        if (!t && !img) return
+        onSend(t, img)
+        if (img) setPhoto(null)
         setText('')
         requestAnimationFrame(resize)
         inputRef.current?.focus()
@@ -514,11 +595,36 @@ function Composer({
                 <div className="mb-2 ml-1 flex items-center gap-2 border-l-[3px] border-accent pl-3 pr-2">
                                         <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-semibold text-accent">Replying to {replyTo.senderName}</p>
-                        <p className="truncate text-[13px] text-muted">{replyTo.content}</p>
+                        <p className="truncate text-[13px] text-muted">{replyTo.content || (replyTo.image ? 'Photo' : '')}</p>
                     </div>
                     <button onClick={onCancelReply} aria-label="Cancel reply" className="text-muted">
                         <X className="h-4 w-4" />
                     </button>
+                </div>
+            )}
+            {(photo || preparing) && (
+                <div className="mb-2 ml-1 flex items-center gap-3">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-surface">
+                        {photo ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- local preview
+                            <img src={photo.previewUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                            <Loader2 className="absolute inset-0 m-auto h-5 w-5 animate-spin text-faint" />
+                        )}
+                    </div>
+                    <p className="flex-1 text-[13px] text-muted">{photo ? 'Add a caption or send' : 'Preparing photo…'}</p>
+                    {photo && (
+                        <button
+                            onClick={() => {
+                                URL.revokeObjectURL(photo.previewUrl)
+                                setPhoto(null)
+                            }}
+                            aria-label="Remove photo"
+                            className="mr-1 text-muted"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    )}
                 </div>
             )}
             {emojiOpen && (
@@ -527,7 +633,7 @@ function Composer({
                         <button
                             key={e}
                             onClick={() => {
-                                submit(e)
+                                submit(e, false)
                                 setEmojiOpen(false)
                             }}
                             className="flex h-10 flex-1 items-center justify-center rounded-xl text-2xl active:scale-90"
@@ -546,6 +652,25 @@ function Composer({
             >
                 <button
                     type="button"
+                    onClick={() => fileRef.current?.click()}
+                    onMouseDown={(e) => e.preventDefault()}
+                    aria-label="Send a photo"
+                    className="mb-[3px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted active:text-accent"
+                >
+                    <ImagePlus className="h-6 w-6" strokeWidth={1.7} />
+                </button>
+                <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                        attach(e.target.files?.[0])
+                        e.target.value = ''
+                    }}
+                />
+                <button
+                    type="button"
                     onClick={() => setEmojiOpen((o) => !o)}
                     aria-label="Quick emoji"
                     className={cn('mb-[3px] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted', emojiOpen && 'text-accent')}
@@ -561,6 +686,13 @@ function Composer({
                         resize()
                         if (e.target.value) onTyping()
                     }}
+                    onPaste={(e) => {
+                        const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith('image/'))
+                        if (file) {
+                            e.preventDefault()
+                            attach(file)
+                        }
+                    }}
                     onKeyDown={(e) => {
                         const coarse = window.matchMedia?.('(pointer: coarse)').matches
                         if (e.key === 'Enter' && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) {
@@ -568,13 +700,13 @@ function Composer({
                             submit()
                         }
                     }}
-                    placeholder="Message"
+                    placeholder={photo ? 'Add a caption' : 'Message'}
                     className="max-h-[140px] min-h-[38px] flex-1 resize-none rounded-[19px] border border-line bg-black px-3.5 py-[7px] text-[16px] leading-[22px] text-white placeholder:text-faint focus:outline-none"
                 />
                 <button
                     type="submit"
                     aria-label="Send"
-                    disabled={!text.trim()}
+                    disabled={!text.trim() && !photo}
                     onMouseDown={(e) => e.preventDefault() /* keep keyboard open */}
                     className="mb-[3px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white active:opacity-80 disabled:bg-surface-2 disabled:text-faint"
                 >
@@ -614,7 +746,13 @@ function ActionSheet({
                 className="w-full max-w-md rounded-t-2xl bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:rounded-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <p className="mb-3 line-clamp-3 px-2 pt-1 text-[14px] text-muted">{m.content}</p>
+                <div className="mb-3 flex items-center gap-3 px-2 pt-1">
+                    {m.image && (
+                        // eslint-disable-next-line @next/next/no-img-element -- thumbnail
+                        <img src={m.image.url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                    )}
+                    <p className="line-clamp-3 text-[14px] text-muted">{m.content || (m.image ? 'Photo' : '')}</p>
+                </div>
                 {!disabled && (
                     <div className="mb-3 flex justify-between rounded-xl bg-surface-2 p-1.5">
                         {REACTION_EMOJIS.map((e) => (
@@ -630,7 +768,7 @@ function ActionSheet({
                 )}
                 <div className="overflow-hidden rounded-xl bg-surface-2 [&>*+*]:border-t [&>*+*]:border-line">
                     {!disabled && <SheetItem icon={<CornerUpLeft className="h-5 w-5" />} label="Reply" onClick={onReply} />}
-                    <SheetItem icon={<Copy className="h-5 w-5" />} label="Copy text" onClick={onCopy} />
+                    {m.content && <SheetItem icon={<Copy className="h-5 w-5" />} label="Copy text" onClick={onCopy} />}
                     {mine && !disabled && (
                         confirmDelete ? (
                             <SheetItem icon={<Trash2 className="h-5 w-5" />} label="Delete for both of you" danger onClick={onDelete} />
@@ -656,5 +794,63 @@ function SheetItem({ icon, label, onClick, danger }: { icon: React.ReactNode; la
             {icon}
             {label}
         </button>
+    )
+}
+
+// ------------------------------------------------------------------ Photo viewer
+
+function PhotoViewer({
+    m,
+    mine,
+    onClose,
+    onReply,
+    onMore,
+}: {
+    m: ChatMessage
+    mine: boolean
+    onClose: () => void
+    onReply: () => void
+    onMore: () => void
+}) {
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [onClose])
+
+    return (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-black" onClick={onClose}>
+            <div
+                className="flex shrink-0 items-center gap-3 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button onClick={onClose} aria-label="Close" className="flex h-10 w-10 items-center justify-center text-white">
+                    <X className="h-6 w-6" />
+                </button>
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold">{mine ? 'You' : m.senderName}</p>
+                    <p className="text-[12px] text-muted">{dayLabel(m.createdAt)} · {timeLabel(m.createdAt)}</p>
+                </div>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- full-size user photo */}
+                <img src={m.image!.url} alt="Photo" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
+            </div>
+            {m.content && <p className="shrink-0 px-5 pt-3 text-center text-[15px] text-white/90">{m.content}</p>}
+            <div
+                className="flex shrink-0 justify-around px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-[13px] text-white"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button onClick={onReply} className="flex flex-col items-center gap-1">
+                    <CornerUpLeft className="h-6 w-6" strokeWidth={1.7} /> Reply
+                </button>
+                <a href={m.image!.url} download={`duo-photo-${m.id}.jpg`} className="flex flex-col items-center gap-1">
+                    <Download className="h-6 w-6" strokeWidth={1.7} /> Save
+                </a>
+                <button onClick={onMore} className="flex flex-col items-center gap-1">
+                    <Smile className="h-6 w-6" strokeWidth={1.7} /> React
+                </button>
+            </div>
+        </div>
     )
 }

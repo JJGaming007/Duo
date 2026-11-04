@@ -6,6 +6,7 @@ import { Home, BookHeart, MessageCircle, Code2, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCodingMode } from '@/lib/prefs'
 import { unreadCount, useMe, useMessages } from '@/lib/data'
+import { useKeyboard } from '@/lib/keyboard'
 
 export const CODE_ROUTES = ['/code', '/tracker', '/log', '/analytics', '/playground']
 
@@ -15,6 +16,7 @@ export function Navbar() {
     const { me } = useMe()
     const { data: messages } = useMessages()
     const unread = unreadCount(messages, me)
+    useKeyboard() // starts keyboard tracking app-wide (hides this bar while typing)
 
     const items = [
         { name: 'Today', href: '/', icon: Home, active: pathname === '/' },
@@ -25,7 +27,7 @@ export function Navbar() {
     ]
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:bottom-auto md:top-0 md:border-b md:border-t-0 md:pb-0">
+        <nav data-tabbar className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:bottom-auto md:top-0 md:border-b md:border-t-0 md:pb-0">
             <div className="mx-auto flex h-16 max-w-xl items-stretch md:h-14 md:max-w-3xl md:items-center md:gap-6 md:px-4">
                 <span className="hidden text-[17px] font-semibold md:block">Duo</span>
                 {items.map(({ name, href, icon: Icon, active, badge }) => (
