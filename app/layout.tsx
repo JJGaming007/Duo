@@ -4,6 +4,7 @@ import ToastProvider from "@/components/providers/ToastProvider";
 import RealtimeProvider from "@/components/providers/RealtimeProvider";
 import SWRProvider from "@/components/providers/SWRProvider";
 import { Navbar } from "@/components/layout/Navbar";
+import { SignedIn } from "@/components/SignedIn";
 
 export const metadata: Metadata = {
   title: "Duo",
@@ -44,9 +45,13 @@ export default function RootLayout({
         className={`flex h-[100dvh] flex-col overflow-hidden bg-black font-sans pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white antialiased md:pb-0 md:pt-14`}
       >
         <SWRProvider>
-          <Navbar />
+          <SignedIn>
+            <Navbar />
+          </SignedIn>
           <main className="w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">{children}</main>
-          <RealtimeProvider />
+          <SignedIn>
+            <RealtimeProvider />
+          </SignedIn>
         </SWRProvider>
         <ToastProvider />
       </body>

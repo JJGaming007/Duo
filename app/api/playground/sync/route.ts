@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { pusherServer } from '@/lib/pusher-server';
 import { db } from '@/lib/db';
 import { playground } from '@/lib/db/schema';
 
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         const body = await req.json();
         const { type, ...data } = body;
+        data.senderId = me; // never trust a client-supplied editor id
 
         // Broadcast code update, presence, or cursor info
         await pusherServer.trigger('playground', 'code-update', {

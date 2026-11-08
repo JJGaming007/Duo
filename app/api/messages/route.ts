@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { desc, eq, inArray, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { images, loveNotes } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
 import { createMessage, MAX_MESSAGE_LENGTH, serializeMessages, uuidOrNull } from '@/lib/server/messages';
-import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
+import { badRequest, serverError } from '@/lib/server/util';
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000; // same as WhatsApp
 
 // GET /api/messages?before=<iso>&limit=50 — newest first
 export async function GET(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
         const { searchParams } = new URL(req.url);
         const before = searchParams.get('before');
@@ -35,9 +38,11 @@ export async function GET(req: Request) {
 // message fields, which uploads and creates the message in one request.)
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { senderId, content, replyToId, clientId, imageId, audioId } = await req.json();
-        if (!isDuoUser(senderId)) return badRequest('Invalid sender');
+        const { content, replyToId, clientId, imageId, audioId } = await req.json();
+        const senderId = me;
         const message = await createMessage({ senderId, content, replyToId, clientId, imageId: uuidOrNull(imageId), audioId: uuidOrNull(audioId) });
         if (!message) return badRequest('Message is empty');
 
@@ -51,9 +56,12 @@ export async function POST(req: Request) {
 // PATCH { messageId, senderId, content } — edit my own text within 15 minutes
 export async function PATCH(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { messageId, senderId, content } = await req.json();
-        if (!uuidOrNull(messageId) || !isDuoUser(senderId)) return badRequest('Message ID and sender ID required');
+        const { messageId, content } = await req.json();
+        const senderId = me;
+        if (!uuidOrNull(messageId)) return badRequest('Message ID required');
         const text = typeof content === 'string' ? content.trim().slice(0, MAX_MESSAGE_LENGTH) : '';
         if (!text) return badRequest('Message is empty');
 
@@ -81,9 +89,12 @@ export async function PATCH(req: Request) {
 // "This message was deleted" placeholder; the photo / voice note is removed.
 export async function DELETE(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { messageId, senderId } = await req.json();
-        if (!uuidOrNull(messageId) || !isDuoUser(senderId)) return badRequest('Message ID and sender ID required');
+        const { messageId } = await req.json();
+        const senderId = me;
+        if (!uuidOrNull(messageId)) return badRequest('Message ID required');
 
         const row = await db.query.loveNotes.findFirst({ where: eq(loveNotes.id, messageId) });
         if (!row || row.senderId !== senderId) return NextResponse.json({ error: 'Not found' }, { status: 404 });

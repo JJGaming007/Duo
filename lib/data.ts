@@ -6,7 +6,7 @@
 import { useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import { appMutate as globalMutate, patchCache } from './swr-mutate'
-import { useIdentity } from './identity'
+import { handleUnauthorized, useIdentity } from './identity'
 import { getUserName, type DuoUser } from './constants'
 import { todayKey } from './dates'
 import type { ChatMessage, DuoMember, PrayerSubject, PrayerSummary } from './types'
@@ -26,6 +26,7 @@ async function send<T = unknown>(url: string, method: string, body: unknown): Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     })
+    if (res.status === 401) handleUnauthorized()
     if (!res.ok) {
         let msg = `Request failed (${res.status})`
         try {
@@ -38,7 +39,7 @@ async function send<T = unknown>(url: string, method: string, body: unknown): Pr
 
 /** Current user + partner */
 export function useMe() {
-    const { currentId, switchUser } = useIdentity()
+    const { currentId, signOut } = useIdentity()
     const me: DuoUser = currentId ?? 'user-1'
     const partner: DuoUser = me === 'user-1' ? 'user-2' : 'user-1'
     return {
@@ -47,7 +48,7 @@ export function useMe() {
         partner,
         meName: getUserName(me),
         partnerName: getUserName(partner),
-        switchUser,
+        signOut,
     }
 }
 

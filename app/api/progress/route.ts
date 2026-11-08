@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { dailyProgress, streaks, users } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
@@ -6,11 +7,9 @@ import { pusherServer } from "@/lib/pusher-server";
 import { seedUsers } from "@/lib/db/seed";
 import { sendPushToPartner } from "@/lib/webpush";
 
-export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) return new NextResponse("User ID required", { status: 400 });
+export async function GET() {
+    const userId = await currentUser();
+    if (!userId) return unauthorized();
 
     const progress = await db.select().from(dailyProgress).where(eq(dailyProgress.userId, userId));
     return NextResponse.json(progress);
@@ -18,9 +17,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     const body = await req.json();
-    const { userId, courseDay, watched, practiced, projectDone, timeSpentMinutes, notes } = body;
-
-    if (!userId) return new NextResponse("User ID required", { status: 400 });
+    const { courseDay, watched, practiced, projectDone, timeSpentMinutes, notes } = body;
+    const userId = await currentUser();
+    if (!userId) return unauthorized();
 
     const today = new Date().toISOString().split('T')[0];
 

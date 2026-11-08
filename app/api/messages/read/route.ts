@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { and, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { loveNotes } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
-import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
+import { serverError } from '@/lib/server/util';
 
 // Mark every unread message from the partner as read
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { userId } = await req.json();
-        if (!isDuoUser(userId)) return badRequest('Invalid user');
+        const userId = me;
 
         const at = new Date();
         const updated = await db

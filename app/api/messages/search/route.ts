@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { and, desc, isNull, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { loveNotes } from '@/lib/db/schema';
@@ -9,6 +10,8 @@ import { serverError } from '@/lib/server/util';
 // GET /api/messages/search?q=… — newest first, text messages only
 export async function GET(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
         const q = (new URL(req.url).searchParams.get('q') || '').trim().slice(0, 100);
         if (q.length < 2) return NextResponse.json([]);

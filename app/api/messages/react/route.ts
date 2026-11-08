@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { loveNotes } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
-import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
+import { badRequest, serverError } from '@/lib/server/util';
 
 // Toggle the caller's reaction on a message (one reaction per person)
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { userId, messageId, emoji } = await req.json();
-        if (!isDuoUser(userId) || !messageId || typeof emoji !== 'string' || emoji.length > 16) {
+        const { messageId, emoji } = await req.json();
+        const userId = me;
+        if (!messageId || typeof emoji !== 'string' || emoji.length > 16) {
             return badRequest('Invalid reaction');
         }
 

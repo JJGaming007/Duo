@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
+import useSWR from 'swr'
 import { Avatar, Group, Page, PageHeader, Row, Section } from '@/components/ui/Page'
 import { NotificationPrompt } from '@/components/NotificationPrompt'
 import { setProfilePhoto, useDuo, useMe } from '@/lib/data'
@@ -10,7 +11,8 @@ import { useCodingMode } from '@/lib/prefs'
 import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
-    const { me, partner, meName, partnerName, switchUser } = useMe()
+    const { me, meName, signOut } = useMe()
+    const email = useSWR<{ email: string | null }>('/api/auth/me').data?.email
     const [coding, setCoding] = useCodingMode()
     const { data: members } = useDuo()
     const hasPhoto = !!members?.find((m) => m.id === me)?.image
@@ -71,14 +73,14 @@ export default function SettingsPage() {
                 </Group>
             </Section>
 
-            <Section title="This device">
+            <Section title="Account" footer="Everything you save in Duo is linked to this Google account.">
                 <Group>
-                    <Row title="Signed in as" trailing={<span className="text-[16px] text-muted">{meName}</span>} />
+                    <Row title="Signed in as" trailing={<span className="max-w-[60vw] truncate text-[16px] text-muted">{email ?? meName}</span>} />
                     <Row
                         onClick={() => {
-                            if (confirm(`Switch this device to ${partnerName}?`)) switchUser(partner)
+                            if (confirm('Sign out of Duo on this device?')) signOut()
                         }}
-                        title={<span className="text-accent">Switch to {partnerName}</span>}
+                        title={<span className="text-[#ff453a]">Sign out</span>}
                     />
                 </Group>
             </Section>

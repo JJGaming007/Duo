@@ -1,4 +1,5 @@
 import { after, NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { prayerSubjects } from '@/lib/db/schema';
@@ -6,7 +7,7 @@ import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
 import { sendPushToPartner } from '@/lib/webpush';
 import { getUserName } from '@/lib/constants';
-import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
+import { badRequest, serverError } from '@/lib/server/util';
 import type { PrayerSubject } from '@/lib/types';
 
 type Row = typeof prayerSubjects.$inferSelect;
@@ -32,6 +33,8 @@ function broadcast(by: string, action: string, id?: string) {
 
 export async function GET() {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
         const rows = await db
             .select()
@@ -44,12 +47,14 @@ export async function GET() {
     }
 }
 
-// Create: { userId, title, notes?, forWhom? }
+// Create: { title, notes?, forWhom? }
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { userId, title, notes, forWhom } = await req.json();
-        if (!isDuoUser(userId)) return badRequest('Invalid user');
+        const { title, notes, forWhom } = await req.json();
+        const userId = me;
         const t = typeof title === 'string' ? title.trim().slice(0, 200) : '';
         if (!t) return badRequest('Title required');
 
@@ -71,12 +76,15 @@ export async function POST(req: Request) {
     }
 }
 
-// Update: { id, userId, action: 'answer' | 'unanswer' | 'prayed' | 'edit', title?, notes? }
+// Update: { id, action: 'answer' | 'unanswer' | 'prayed' | 'edit', title?, notes? }
 export async function PATCH(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { id, userId, action, title, notes } = await req.json();
-        if (!id || !isDuoUser(userId)) return badRequest('id and userId required');
+        const { id, action, title, notes } = await req.json();
+        const userId = me;
+        if (!id) return badRequest('id required');
 
         let set: Partial<Row> | Record<string, unknown>;
         switch (action) {
@@ -115,8 +123,11 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
-        const { id, userId } = await req.json();
-        if (!id || !isDuoUser(userId)) return badRequest('id and userId required');
+        const me = await currentUser();
+        if (!me) return unauthorized();
+        const { id } = await req.json();
+        const userId = me;
+        if (!id) return badRequest('id required');
         await db.delete(prayerSubjects).where(eq(prayerSubjects.id, id));
         await broadcast(userId, 'delete', id).catch(() => {});
         return NextResponse.json({ success: true });
