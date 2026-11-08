@@ -1,6 +1,7 @@
-// Generates the app icons from one SVG: two interlocking rings (blue = Jibin,
-// rose = Achsah, the app's own colours) with a warm glow where they overlap.
-// Run: node scripts/generate-icons.js
+// Generates the app icons from one SVG, in the app's colours (blue = Jibin,
+// rose = Achsah, coral accent).
+//   node scripts/generate-icons.js          -> "sprout" (current icon)
+//   node scripts/generate-icons.js rings    -> interlocking rings
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +17,7 @@ const iy = CY + Math.sqrt(R * R - ((RX - LX) / 2) ** 2);
 
 // The rings stay well inside the central 80% "safe zone", so Android can mask
 // the icon to any shape (circle, squircle) without clipping them.
-const svg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+const ringsSvg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#211719"/><stop offset="1" stop-color="#0b0809"/></linearGradient>
   <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffe0bf"/><stop offset=".6" stop-color="#f4a07c"/><stop offset="1" stop-color="#e8735a"/></radialGradient>
@@ -37,6 +38,37 @@ const svg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" h
   <circle cx="${LX}" cy="${CY}" r="${R}" fill="none" stroke="url(#blue)" stroke-width="${SW}"/>
 </g>
 </svg>`;
+
+// Sprout: two leaves from one stem, together forming a heart ("grow together")
+const leafL = 'M253 304 C 196 278, 118 240, 116 176 C 114 124, 170 102, 210 132 C 242 156, 256 214, 253 304 Z';
+const mirror = (p) => p.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x, y) => `${512 - Number(x)} ${y}`);
+const vein = 'M250 292 C 236 240, 204 192, 156 160';
+const sproutSvg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26191b"/><stop offset="1" stop-color="#0b0809"/></linearGradient>
+  <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffcf9e" stop-opacity=".75"/><stop offset=".45" stop-color="#e8735a" stop-opacity=".28"/><stop offset="1" stop-color="#e8735a" stop-opacity="0"/></radialGradient>
+  <linearGradient id="lb" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#4f71a6"/><stop offset="1" stop-color="#a4c0ec"/></linearGradient>
+  <linearGradient id="lr" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ad5f6c"/><stop offset="1" stop-color="#f0b0b8"/></linearGradient>
+  <linearGradient id="stem" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd8ae"/><stop offset="1" stop-color="#e8735a"/></linearGradient>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<circle cx="256" cy="226" r="210" fill="url(#sun)"/>
+<path d="M256 404 C 256 376, 252 340, 253 292" stroke="url(#stem)" stroke-width="20" stroke-linecap="butt" fill="none"/>
+<circle cx="256" cy="404" r="10" fill="#e8735a"/>
+<path d="${leafL}" fill="url(#lb)"/>
+<path d="${mirror(leafL)}" fill="url(#lr)"/>
+<path d="${vein}" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="${mirror(vein)}" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-linecap="round" fill="none"/>
+<ellipse cx="256" cy="408" rx="46" ry="7" fill="#e8735a" opacity=".35"/>
+</svg>`;
+
+const DESIGNS = { sprout: sproutSvg, rings: ringsSvg };
+const design = process.argv[2] || 'sprout';
+const svg = DESIGNS[design];
+if (!svg) {
+    console.error(`Unknown design "${design}". Use one of: ${Object.keys(DESIGNS).join(', ')}`);
+    process.exit(1);
+}
 
 const root = path.join(__dirname, '..');
 const iconsDir = path.join(root, 'public', 'icons');
@@ -75,7 +107,7 @@ async function main() {
     const sizes = [16, 32, 48];
     const images = await Promise.all(sizes.map(async (size) => ({ size, data: await png(size).toBuffer() })));
     fs.writeFileSync(path.join(root, 'app', 'favicon.ico'), ico(images));
-    console.log('Icons written to public/icons and app/favicon.ico');
+    console.log(`Icons (${design}) written to public/icons and app/favicon.ico`);
 }
 
 main().catch((e) => {
