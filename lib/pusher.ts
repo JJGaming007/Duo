@@ -12,6 +12,10 @@ let _authParams: Record<string, string> = {}
 
 export const pusherClient = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    // Notice a dead connection (phone slept, network switched) within ~40s
+    // instead of the default ~2.5 minutes. Events sent meanwhile are lost.
+    activityTimeout: 30_000,
+    pongTimeout: 10_000,
     userAuthentication: {
         endpoint: '/api/pusher/auth',
         transport: 'ajax',

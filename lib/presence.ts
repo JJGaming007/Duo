@@ -12,7 +12,8 @@ import { useSyncExternalStore } from 'react'
 import { pusherClient } from './pusher'
 
 const CHANNEL = 'presence-duo'
-const HEARTBEAT_MS = 60_000
+// Also tells the server not to send pushes while the app is on screen (lib/webpush.ts)
+const HEARTBEAT_MS = 30_000
 
 let online = new Set<string>()
 const listeners = new Set<() => void>()

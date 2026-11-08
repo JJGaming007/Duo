@@ -24,3 +24,8 @@ export function patchCache<T>(key: string, fn: (data: T) => T) {
     if (current === undefined) return Promise.resolve(undefined)
     return appMutate<T>(key, (data) => (data === undefined ? data : fn(data)), { revalidate: false })
 }
+
+/** Read cached data without mutating (a mutate would cancel an in-flight fetch). */
+export function readCache<T>(key: string): T | undefined {
+    return boundCache?.get(key)?.data as T | undefined
+}
