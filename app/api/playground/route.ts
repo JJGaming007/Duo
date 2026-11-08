@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { db } from '@/lib/db';
 import { playground } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function GET() {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         const state = await db.query.playground.findFirst({
             where: eq(playground.id, 'default'),
         });

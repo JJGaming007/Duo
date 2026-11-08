@@ -1,5 +1,26 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Google sign-in
+
+Each person signs in with their Google account. Their Gmail is linked to their
+Duo profile (`users.email`) and every message, prayer log, photo and setting
+they save is tied to that profile. The server reads who is signed in from a
+signed session cookie, never from IDs sent by the browser.
+
+Environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client (Google Cloud Console → APIs & Services → Credentials → *Web application*) |
+| `AUTH_SECRET` | Long random string used to sign sessions (`openssl rand -base64 32`) |
+| `DUO_USER_1_EMAIL` | Jibin's Gmail (comma-separate to allow more than one) |
+| `DUO_USER_2_EMAIL` | Achsah's Gmail |
+| `AUTH_URL` | Optional. Public URL (e.g. `https://duo.example.com`) if it differs from the request host |
+
+In the OAuth client, add `https://<your-domain>/api/auth/callback/google` (and
+`http://localhost:3000/api/auth/callback/google` for local dev) as an
+authorized redirect URI. Any Google account not listed above is refused.
+
 ## Getting Started
 
 First, run the development server:

@@ -3,11 +3,13 @@
 import { useSyncExternalStore } from 'react'
 import { SWRConfig, useSWRConfig, type Cache } from 'swr'
 import { setAppMutate } from '@/lib/swr-mutate'
+import { handleUnauthorized } from '@/lib/identity'
 
 const STORAGE_KEY = 'codetrack-swr-cache-v1'
 
 export const fetcher = (url: string) =>
     fetch(url).then(res => {
+        if (res.status === 401) handleUnauthorized()
         if (!res.ok) throw new Error(`Request failed: ${res.status}`)
         return res.json()
     })

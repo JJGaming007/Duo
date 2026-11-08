@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { db } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -6,10 +7,13 @@ import { eq, and } from "drizzle-orm";
 // Save a push subscription
 export async function POST(req: Request) {
     try {
-        const { userId, subscription } = await req.json();
+        const me = await currentUser();
+        if (!me) return unauthorized();
+        const { subscription } = await req.json();
+        const userId = me;
 
-        if (!userId || !subscription?.endpoint || !subscription?.keys) {
-            return new NextResponse("Missing userId or subscription data", { status: 400 });
+        if (!subscription?.endpoint || !subscription?.keys) {
+            return new NextResponse("Missing subscription data", { status: 400 });
         }
 
         const { endpoint, keys } = subscription;
@@ -35,6 +39,8 @@ export async function POST(req: Request) {
 // Remove a push subscription
 export async function DELETE(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         const { endpoint } = await req.json();
 
         if (!endpoint) {

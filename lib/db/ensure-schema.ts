@@ -48,16 +48,19 @@ const TABLES = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_emoji text`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_label text`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_updated_at timestamp`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS email text`,
 ];
 const INDEXES = [
     `CREATE UNIQUE INDEX IF NOT EXISTS prayer_logs_user_date_unique ON prayer_logs (user_id, date)`,
     `CREATE INDEX IF NOT EXISTS love_notes_created_at_idx ON love_notes (created_at)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email)`,
 ];
 
 // Newest columns added above. If they all exist, every earlier statement has
 // run too, so a warm database costs one query instead of ~20 sequential DDL
 // round-trips on each cold start.
 const LATEST = [
+    ['users', 'email'],
     ['love_notes', 'deleted_at'],
     ['love_notes', 'audio_id'],
     ['images', 'waveform'],

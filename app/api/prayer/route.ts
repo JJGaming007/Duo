@@ -1,4 +1,5 @@
 import { after, NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { and, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { prayerLogs } from '@/lib/db/schema';
@@ -6,7 +7,7 @@ import { ensureSchema } from '@/lib/db/ensure-schema';
 import { pusherServer } from '@/lib/pusher-server';
 import { sendPushToPartner } from '@/lib/webpush';
 import { getUserName, type DuoUser } from '@/lib/constants';
-import { addDays, badRequest, isDateKey, isDuoUser, serverError } from '@/lib/server/util';
+import { addDays, badRequest, isDateKey, serverError } from '@/lib/server/util';
 import type { PrayerSummary } from '@/lib/types';
 
 const USERS: DuoUser[] = ['user-1', 'user-2'];
@@ -50,6 +51,8 @@ async function buildSummary(date: string): Promise<PrayerSummary> {
 // GET /api/prayer?date=YYYY-MM-DD (client's local today)
 export async function GET(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
         const date = new URL(req.url).searchParams.get('date');
         if (!isDateKey(date)) return badRequest('date=YYYY-MM-DD required');
@@ -59,12 +62,14 @@ export async function GET(req: Request) {
     }
 }
 
-// POST { userId, date, delta: 1 | -1, together?: boolean }
+// POST { date, delta: 1 | -1, together?: boolean }
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
-        const { userId, date, delta, together } = await req.json();
-        if (!isDuoUser(userId)) return badRequest('Invalid user');
+        const { date, delta, together } = await req.json();
+        const userId = me;
         if (!isDateKey(date)) return badRequest('Invalid date');
         if (delta !== 1 && delta !== -1) return badRequest('delta must be 1 or -1');
 

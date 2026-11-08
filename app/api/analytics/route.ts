@@ -1,14 +1,13 @@
 import { db } from "@/lib/db";
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { dailyProgress, streaks, users } from "@/lib/db/schema";
 import { NextResponse } from "next/server";
 import { eq, asc, count } from "drizzle-orm";
 import { seedUsers } from "@/lib/db/seed";
 
-export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) return new NextResponse("User ID required", { status: 400 });
+export async function GET() {
+    const userId = await currentUser();
+    if (!userId) return unauthorized();
 
     await seedUsers();
 

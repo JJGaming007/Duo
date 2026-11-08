@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { db } from '@/lib/db';
 import { images } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
-import { badRequest, isDuoUser, serverError } from '@/lib/server/util';
+import { badRequest, serverError } from '@/lib/server/util';
 import { createMessage } from '@/lib/server/messages';
 
 const MAX_BYTES = 3 * 1024 * 1024; // photos are resized and voice notes capped well below this
@@ -42,13 +43,14 @@ async function storeMedia(bytes: ArrayBuffer, mime: string, meta: Meta) {
  */
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         await ensureSchema();
         const contentType = req.headers.get('content-type') || '';
 
         if (contentType.startsWith('multipart/form-data')) {
             const form = await req.formData();
-            const senderId = form.get('senderId');
-            if (!isDuoUser(senderId)) return badRequest('Invalid sender');
+            const senderId = me;
             const file = form.get('file');
             if (!(file instanceof Blob) || !file.size) return badRequest('Missing file');
             const mime = (file.type || '').split(';')[0].trim();
@@ -71,8 +73,7 @@ export async function POST(req: Request) {
         }
 
         const { searchParams } = new URL(req.url);
-        const userId = searchParams.get('userId');
-        if (!isDuoUser(userId)) return badRequest('Invalid user');
+        const userId = me;
 
         const mime = contentType.split(';')[0].trim();
         if (!IMAGE_TYPES.has(mime) && !AUDIO_TYPES.has(mime)) return badRequest('Unsupported file type');

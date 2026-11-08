@@ -1,15 +1,15 @@
 import { after, NextResponse } from "next/server";
+import { currentUser, unauthorized } from '@/lib/auth/server';
 import { pusherServer } from "@/lib/pusher-server";
 import { sendPushToPartner } from "@/lib/webpush";
 
 export async function POST(req: Request) {
     try {
+        const me = await currentUser();
+        if (!me) return unauthorized();
         const body = await req.json();
-        const { senderId, type } = body;
-
-        if (!senderId) {
-            return new NextResponse("Sender ID required", { status: 400 });
-        }
+        const { type } = body;
+        const senderId = me;
 
         const { getUserName } = await import('@/lib/constants');
         const senderName = getUserName(senderId);
