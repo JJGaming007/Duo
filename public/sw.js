@@ -1,7 +1,7 @@
 // Service Worker for Duo
 // Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'duo-v7';
+const CACHE_NAME = 'duo-v8';
 const NAV_TIMEOUT_MS = 3000;
 const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96.png'];
 const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
