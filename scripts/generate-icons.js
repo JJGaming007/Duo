@@ -1,40 +1,84 @@
+// Generates the app icons from one SVG: two interlocking rings (blue = Jibin,
+// rose = Achsah, the app's own colours) with a warm glow where they overlap.
+// Run: node scripts/generate-icons.js
 const sharp = require('sharp');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 
-const inputImagePath = 'C:\\Users\\jibin\\.gemini\\antigravity\\brain\\04ff799f-5389-4e8b-aa33-409868b0cb94\\codetrack_icon_1772014692765.png';
-const outputDir = 'd:\\GitHub\\Duo\\public\\icons';
+const R = 114; // ring radius
+const SW = 36; // ring thickness
+const CY = 256;
+const LX = 202;
+const RX = 310;
+// Bottom crossing point of the two rings (where the blue one weaves back over)
+const ix = (LX + RX) / 2;
+const iy = CY + Math.sqrt(R * R - ((RX - LX) / 2) ** 2);
 
-async function generateIcons() {
-    try {
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
+// The rings stay well inside the central 80% "safe zone", so Android can mask
+// the icon to any shape (circle, squircle) without clipping them.
+const svg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#211719"/><stop offset="1" stop-color="#0b0809"/></linearGradient>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffe0bf"/><stop offset=".6" stop-color="#f4a07c"/><stop offset="1" stop-color="#e8735a"/></radialGradient>
+  <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#e8735a" stop-opacity=".28"/><stop offset="1" stop-color="#e8735a" stop-opacity="0"/></radialGradient>
+  <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86a8de"/><stop offset="1" stop-color="#5b7db1"/></linearGradient>
+  <linearGradient id="rose" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e199a3"/><stop offset="1" stop-color="#b86b77"/></linearGradient>
+  <clipPath id="inL"><circle cx="${LX}" cy="${CY}" r="${R}"/></clipPath>
+  <clipPath id="cross"><rect x="${ix - 44}" y="${iy - 44}" width="88" height="88"/></clipPath>
+  <mask id="onRose" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><circle cx="${RX}" cy="${CY}" r="${R}" fill="none" stroke="#fff" stroke-width="${SW}"/></mask>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<circle cx="256" cy="256" r="230" fill="url(#halo)"/>
+<circle cx="${RX}" cy="${CY}" r="${R}" fill="url(#glow)" clip-path="url(#inL)"/>
+<circle cx="${LX}" cy="${CY}" r="${R}" fill="none" stroke="url(#blue)" stroke-width="${SW}"/>
+<circle cx="${RX}" cy="${CY}" r="${R}" fill="none" stroke="url(#rose)" stroke-width="${SW}"/>
+<g clip-path="url(#cross)">
+  <circle cx="${LX}" cy="${CY}" r="${R}" fill="none" stroke="#0b0809" stroke-opacity=".6" stroke-width="${SW + 12}" mask="url(#onRose)"/>
+  <circle cx="${LX}" cy="${CY}" r="${R}" fill="none" stroke="url(#blue)" stroke-width="${SW}"/>
+</g>
+</svg>`;
 
-        // Generate 192x192
-        await sharp(inputImagePath)
-            .resize(192, 192)
-            .toFile(path.join(outputDir, 'icon-192x192.png'));
+const root = path.join(__dirname, '..');
+const iconsDir = path.join(root, 'public', 'icons');
 
-        console.log('Successfully created icon-192x192.png');
+// Render large once, then downscale (crisper than rendering small)
+const master = () => sharp(Buffer.from(svg(1024)));
+const png = (size) => master().resize(size, size).png({ compressionLevel: 9 });
 
-        // Generate 512x512
-        await sharp(inputImagePath)
-            .resize(512, 512)
-            .toFile(path.join(outputDir, 'icon-512x512.png'));
-
-        console.log('Successfully created icon-512x512.png');
-
-        // Generate Apple Touch Icon
-        await sharp(inputImagePath)
-            .resize(180, 180)
-            .toFile(path.join(outputDir, 'apple-touch-icon.png'));
-
-        console.log('Successfully created apple-touch-icon.png');
-
-    } catch (error) {
-        console.error('Error generating icons:', error);
-    }
+/** .ico holding PNG images (supported by every current browser) */
+function ico(images) {
+    const header = Buffer.alloc(6);
+    header.writeUInt16LE(0, 0);
+    header.writeUInt16LE(1, 2);
+    header.writeUInt16LE(images.length, 4);
+    let offset = 6 + 16 * images.length;
+    const entries = images.map(({ size, data }) => {
+        const e = Buffer.alloc(16);
+        e.writeUInt8(size >= 256 ? 0 : size, 0);
+        e.writeUInt8(size >= 256 ? 0 : size, 1);
+        e.writeUInt16LE(1, 4); // colour planes
+        e.writeUInt16LE(32, 6); // bits per pixel
+        e.writeUInt32LE(data.length, 8);
+        e.writeUInt32LE(offset, 12);
+        offset += data.length;
+        return e;
+    });
+    return Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
 }
 
-generateIcons();
+async function main() {
+    fs.mkdirSync(iconsDir, { recursive: true });
+    await png(512).toFile(path.join(iconsDir, 'icon-512x512.png'));
+    await png(192).toFile(path.join(iconsDir, 'icon-192x192.png'));
+    // iOS rounds the corners itself; the icon must be opaque and full-bleed
+    await png(180).toFile(path.join(iconsDir, 'apple-touch-icon.png'));
+    const sizes = [16, 32, 48];
+    const images = await Promise.all(sizes.map(async (size) => ({ size, data: await png(size).toBuffer() })));
+    fs.writeFileSync(path.join(root, 'app', 'favicon.ico'), ico(images));
+    console.log('Icons written to public/icons and app/favicon.ico');
+}
+
+main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+});
