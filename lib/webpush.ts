@@ -1,7 +1,8 @@
 import webpush from 'web-push';
 import { db } from '@/lib/db';
 import { pushSubscriptions, users } from '@/lib/db/schema';
-import { eq, ne } from 'drizzle-orm';
+import { eq, inArray, ne } from 'drizzle-orm';
+import { pusherServer } from '@/lib/pusher-server';
 
 /**
  * web-push requires URL-safe base64 without padding. Env values pasted into
@@ -30,8 +31,41 @@ function ensureVapidConfigured() {
     vapidConfigured = true;
 }
 
+const PRESENCE_CHANNEL = 'presence-duo';
+// The app sends a heartbeat every 30s while on screen
+const FRESH_MS = 75_000;
+
 /**
- * Send a push notification to all subscriptions EXCEPT the sender's.
+ * People who have the app open on screen right now. Each phone is in the
+ * presence channel only while the app is visible (lib/presence.ts), and must
+ * also have sent a recent heartbeat, in case a dropped connection hasn't been
+ * noticed yet. They already get the message live plus an in-app banner, so
+ * they don't need a push. (iOS can't hide a push that arrives while the app is
+ * open: it shows it anyway, so it's better not to send one.)
+ * Any failure counts as "not on screen", so a push is never lost because of it.
+ */
+async function onScreen(userIds: string[]): Promise<Set<string>> {
+    if (!userIds.length) return new Set();
+    try {
+        const res = await Promise.race([
+            pusherServer.get({ path: `/channels/${PRESENCE_CHANNEL}/users` }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('presence timeout')), 1500)),
+        ]);
+        if (!res.ok) return new Set();
+        const { users: members = [] } = (await res.json()) as { users?: { id: string }[] };
+        const present = userIds.filter((id) => members.some((m) => m.id === id));
+        if (!present.length) return new Set();
+        const rows = await db.select({ id: users.id, lastSeenAt: users.lastSeenAt }).from(users).where(inArray(users.id, present));
+        return new Set(rows.filter((r) => r.lastSeenAt && Date.now() - new Date(r.lastSeenAt).getTime() < FRESH_MS).map((r) => r.id));
+    } catch (e) {
+        console.warn('Presence check failed, sending push anyway:', e);
+        return new Set();
+    }
+}
+
+/**
+ * Send a push notification to all subscriptions EXCEPT the sender's, skipping
+ * anyone who has the app open on screen.
  */
 export type PushKind = 'chat' | 'prayer' | 'subject' | 'nudge' | 'progress';
 
@@ -52,6 +86,10 @@ export async function sendPushToPartner(
             db.select({ image: users.image }).from(users).where(eq(users.id, senderId)).catch(() => []),
         ]);
 
+        const visible = await onScreen([...new Set(subscriptions.map((s) => s.userId))]);
+        const targets = subscriptions.filter((s) => !visible.has(s.userId));
+        if (!targets.length) return { sent: 0, skipped: subscriptions.length };
+
         const kind = opts.kind ?? 'chat';
         const payloadFor = (to: string) => JSON.stringify({
             to,
@@ -65,7 +103,7 @@ export async function sendPushToPartner(
         });
 
         const results = await Promise.allSettled(
-            subscriptions.map(async (sub) => {
+            targets.map(async (sub) => {
                 try {
                     await webpush.sendNotification(
                         {

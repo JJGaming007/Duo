@@ -131,23 +131,46 @@ export default function RealtimeProvider() {
             },
         })
 
-        // Events sent while we were disconnected are lost: refetch on reconnect
-        let wasDisconnected = false
-        const onState = ({ current }: { current: string }) => {
-            if (current === 'connected' && wasDisconnected) {
-                mutate(KEYS.messages)
-                mutate(KEYS.subjects)
-                mutate((key) => typeof key === 'string' && key.startsWith('/api/prayer?'))
-            }
-            if (current === 'unavailable' || current === 'disconnected') wasDisconnected = true
+        // Events sent while the connection was down are lost, so refetch whenever
+        // it comes back. (pusher-js recovers from a dead socket via 'connecting',
+        // not 'disconnected', so any return to 'connected' counts.)
+        const refetchAll = () => {
+            mutate(KEYS.messages)
+            mutate(KEYS.subjects)
+            mutate((key) => typeof key === 'string' && key.startsWith('/api/prayer?'))
+        }
+        const onState = ({ previous, current }: { previous: string; current: string }) => {
+            if (current === 'connected' && previous !== 'connected' && previous !== 'initialized') refetchAll()
         }
         pusherClient.connection.bind('state_change', onState)
+
+        // Back from the background: phones suspend the socket, and it can look
+        // "connected" while it's dead, silently dropping new messages. After a
+        // real absence, start a fresh connection (channels resubscribe) and refetch.
+        let hiddenAt = 0
+        const onVisibility = () => {
+            if (document.visibilityState === 'hidden') {
+                hiddenAt = Date.now()
+                return
+            }
+            if (!hiddenAt || Date.now() - hiddenAt < 10_000) return
+            hiddenAt = 0
+            if (pusherClient.connection.state === 'connected') {
+                pusherClient.disconnect()
+                pusherClient.connect()
+            } else {
+                pusherClient.connect()
+            }
+            refetchAll()
+        }
+        document.addEventListener('visibilitychange', onVisibility)
 
         return () => {
             unbindChat()
             unbindPrayer()
             unbindProgress()
             pusherClient.connection.unbind('state_change', onState)
+            document.removeEventListener('visibilitychange', onVisibility)
         }
     }, [ready, me, partnerName, router])
 

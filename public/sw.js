@@ -1,7 +1,7 @@
 // Service Worker for Duo
 // Web Push notifications (grouped per kind), notification clicks, offline caching.
 
-const CACHE_NAME = 'duo-v8';
+const CACHE_NAME = 'duo-v9';
 const NAV_TIMEOUT_MS = 3000;
 const APP_SHELL_URLS = ['/', '/chat', '/prayer', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96.png'];
 const IS_APPLE = /iphone|ipad|ipod|macintosh/i.test(self.navigator.userAgent);
@@ -78,17 +78,28 @@ async function handlePush(data) {
     };
 
     if (appVisible) {
-        // Safari revokes push permission if a push doesn't show a notification,
-        // so on Apple devices show it and close it straight away.
+        // The server normally doesn't push to an app that's on screen (lib/webpush.ts).
+        // If one slips through: Safari revokes push permission when a push shows no
+        // notification, so on Apple devices show it and close it straight away.
         if (IS_APPLE) {
             await self.registration.showNotification(shownTitle, { ...options, silent: true });
-            const shown = await self.registration.getNotifications({ tag });
-            shown.forEach((n) => n.close());
+            await closeAll(tag);
         }
         return;
     }
 
+    // iOS ignores `tag`, so a new notification doesn't replace the old one and
+    // they pile up. Close the earlier ones ourselves; the new one carries their
+    // lines ("Jibin (3)"), so nothing is lost.
+    if (IS_APPLE) await closeAll(tag);
     await self.registration.showNotification(shownTitle, options);
+}
+
+async function closeAll(tag) {
+    try {
+        const list = await self.registration.getNotifications(tag ? { tag } : undefined);
+        list.forEach((n) => n.close());
+    } catch (e) { /* not supported */ }
 }
 
 self.addEventListener('notificationclick', (event) => {

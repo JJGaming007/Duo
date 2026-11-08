@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from 'react'
 import useSWR from 'swr'
-import { appMutate as globalMutate, patchCache } from './swr-mutate'
+import { appMutate as globalMutate, patchCache, readCache } from './swr-mutate'
 import { handleUnauthorized, useIdentity } from './identity'
 import { getUserName, type DuoUser } from './constants'
 import { todayKey } from './dates'
@@ -54,8 +54,36 @@ export function useMe() {
 
 // ---------------------------------------------------------------- Messages
 
+/**
+ * Latest messages from the server, keeping my own messages that are still
+ * sending (or failed) so a refresh never makes them vanish mid-upload.
+ */
+async function fetchMessages(url: string): Promise<ChatMessage[]> {
+    const res = await fetch(url)
+    if (res.status === 401) handleUnauthorized()
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+    const server = (await res.json()) as ChatMessage[]
+    // The server may already have a message whose send request hasn't returned yet
+    const onServer = (m: ChatMessage) =>
+        server.some(
+            (s) =>
+                s.id === m.id ||
+                (s.senderId === m.senderId &&
+                    s.content === m.content &&
+                    !!s.image === !!m.image &&
+                    !!s.audio === !!m.audio &&
+                    Math.abs(new Date(s.createdAt).getTime() - new Date(m.createdAt).getTime()) < 120_000),
+        )
+    const unsent = (readCache<ChatMessage[]>(KEYS.messages) ?? []).filter((m) => (m.pending || m.failed) && !onServer(m))
+    return [...unsent, ...server].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+}
+
 export function useMessages() {
-    return useSWR<ChatMessage[]>(KEYS.messages)
+    return useSWR<ChatMessage[]>(KEYS.messages, fetchMessages, {
+        // Safety net if a live event is ever missed: re-check every 20s while
+        // the app is on screen (never in the background).
+        refreshInterval: 20_000,
+    })
 }
 
 /** Insert or replace (by id or clientId), keeping newest-first order. */
