@@ -1,6 +1,7 @@
 // Generates the app icons from one SVG, in the app's colours (blue = Jibin,
 // rose = Achsah, coral accent).
-//   node scripts/generate-icons.js          -> "sprout" (current icon)
+//   node scripts/generate-icons.js          -> "bubbles" (current icon)
+//   node scripts/generate-icons.js sprout   -> two heart-shaped leaves
 //   node scripts/generate-icons.js rings    -> interlocking rings
 const sharp = require('sharp');
 const fs = require('fs');
@@ -62,8 +63,30 @@ const sproutSvg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${si
 <ellipse cx="256" cy="408" rx="46" ry="7" fill="#e8735a" opacity=".35"/>
 </svg>`;
 
-const DESIGNS = { sprout: sproutSvg, rings: ringsSvg };
-const design = process.argv[2] || 'sprout';
+// Bubbles: two chat bubbles leaning together, a heart where they meet
+const bubbleL = 'M206 136 C 270 136, 318 178, 318 236 C 318 294, 270 336, 206 336 C 192 336, 178 334, 166 330 L 116 362 L 130 310 C 108 292, 94 266, 94 236 C 94 178, 142 136, 206 136 Z';
+const heart = 'M256 214 C 244 192, 208 194, 208 225 C 208 254, 240 273, 256 290 C 272 273, 304 254, 304 225 C 304 194, 268 192, 256 214 Z';
+const bubblesSvg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f39a7e"/><stop offset="1" stop-color="#d4523c"/></linearGradient>
+  <radialGradient id="hi" cx=".3" cy=".15" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#fff3ee"/></linearGradient>
+  <linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9df"/><stop offset="1" stop-color="#ffd6c6"/></linearGradient>
+  <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ef7a5f"/><stop offset="1" stop-color="#d4523c"/></linearGradient>
+  <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#7a2414" flood-opacity=".28"/></filter>
+  <filter id="sh2" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="6" dy="0" stdDeviation="6" flood-color="#9c3b26" flood-opacity=".25"/></filter>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<rect width="512" height="512" fill="url(#hi)"/>
+<g filter="url(#sh)" transform="translate(0 6)">
+  <path d="${mirror(bubbleL)}" fill="url(#c)"/>
+  <path d="${bubbleL}" fill="url(#w)" filter="url(#sh2)"/>
+</g>
+<path d="${heart}" fill="url(#h)" transform="translate(0 6)"/>
+</svg>`;
+
+const DESIGNS = { bubbles: bubblesSvg, sprout: sproutSvg, rings: ringsSvg };
+const design = process.argv[2] || 'bubbles';
 const svg = DESIGNS[design];
 if (!svg) {
     console.error(`Unknown design "${design}". Use one of: ${Object.keys(DESIGNS).join(', ')}`);
