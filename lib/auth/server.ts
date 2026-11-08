@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import type { DuoUser } from '@/lib/constants';
+import { PARTNER_A_EMAIL, PARTNER_B_EMAIL, type DuoUser } from '@/lib/constants';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { ensureSchema } from '@/lib/db/ensure-schema';
@@ -24,13 +24,13 @@ export function unauthorized() {
 const norm = (email: string) => email.trim().toLowerCase();
 
 function envEmails(slot: DuoUser) {
-    const raw = slot === 'user-1' ? process.env.DUO_USER_1_EMAIL : process.env.DUO_USER_2_EMAIL;
+    const raw = slot === 'user-1' ? process.env.DUO_USER_1_EMAIL || PARTNER_A_EMAIL : process.env.DUO_USER_2_EMAIL || PARTNER_B_EMAIL;
     return (raw || '').split(',').map(norm).filter(Boolean);
 }
 
 /**
  * Which Duo slot a Google account belongs to, from DUO_USER_1_EMAIL (Jibin) and
- * DUO_USER_2_EMAIL (Achsah); each may list several addresses, comma-separated.
+ * DUO_USER_2_EMAIL (Achsah), falling back to the emails in lib/constants.ts; each may list several addresses, comma-separated.
  * Any other Google account is refused. The Gmail is stored on the user row, so
  * everything that person saves stays tied to that address.
  */

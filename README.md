@@ -13,8 +13,8 @@ Environment variables:
 | --- | --- |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client (Google Cloud Console → APIs & Services → Credentials → *Web application*) |
 | `AUTH_SECRET` | Long random string used to sign sessions (`openssl rand -base64 32`) |
-| `DUO_USER_1_EMAIL` | Jibin's Gmail (comma-separate to allow more than one) |
-| `DUO_USER_2_EMAIL` | Achsah's Gmail |
+| `DUO_USER_1_EMAIL` | Jibin's Gmail (defaults to `PARTNER_A_EMAIL` in `lib/constants.ts`; comma-separate to allow more than one) |
+| `DUO_USER_2_EMAIL` | Achsah's Gmail (defaults to `PARTNER_B_EMAIL` in `lib/constants.ts`) |
 | `AUTH_URL` | Optional. Public URL (e.g. `https://duo.example.com`) if it differs from the request host |
 
 In the OAuth client, add `https://<your-domain>/api/auth/callback/google` (and
